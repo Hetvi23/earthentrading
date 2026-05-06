@@ -1,0 +1,74 @@
+# Copyright (c) 2026, Earth Trading and contributors
+# License: MIT. See license.txt
+
+import frappe
+from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+from earthentrading.setup.custom_fields import CUSTOM_FIELDS
+from earthentrading.setup.roles import ensure_role_permissions, ensure_roles
+from earthentrading.setup.crm_workspace import (
+	ensure_earth_trading_workspace,
+	refresh_web_form_incoterm,
+)
+from earthentrading.setup.hub_workspace import ensure_earth_trading_hub_workspace
+from earthentrading.setup.kanban import ensure_lead_pipeline_kanban
+from earthentrading.setup.task_templates import ensure_task_templates
+from earthentrading.setup.migrate_trading_lines import run_all as migrate_trading_lines_data
+from earthentrading.setup.web_form import ensure_lead_web_form, sync_earth_trading_lead_web_form
+from earthentrading.setup.workflow import ensure_workflows
+
+
+def before_install():
+	if "erpnext" not in frappe.get_installed_apps():
+		frappe.throw("Earth Trading requires ERPNext to be installed on the site.")
+
+
+def after_install():
+	_install_all()
+
+
+def after_migrate():
+	_install_all()
+
+
+def _install_all():
+	create_custom_fields(CUSTOM_FIELDS, update=True)
+	try:
+		migrate_trading_lines_data()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.migrate_trading_lines_data")
+	ensure_roles()
+	ensure_role_permissions()
+	try:
+		ensure_workflows()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_workflows")
+	try:
+		ensure_lead_web_form()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_lead_web_form")
+	try:
+		sync_earth_trading_lead_web_form()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.sync_earth_trading_lead_web_form")
+	try:
+		ensure_task_templates()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_task_templates")
+	try:
+		ensure_lead_pipeline_kanban()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_lead_pipeline_kanban")
+	try:
+		refresh_web_form_incoterm()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.refresh_web_form_incoterm")
+	try:
+		ensure_earth_trading_hub_workspace()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_earth_trading_hub_workspace")
+	try:
+		ensure_earth_trading_workspace()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_earth_trading_workspace")
+	frappe.clear_cache()

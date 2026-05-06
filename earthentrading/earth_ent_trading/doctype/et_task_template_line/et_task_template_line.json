@@ -1,0 +1,46 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-04 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "task_title",
+  "assigned_to",
+  "instructions"
+ ],
+ "fields": [
+  {
+   "fieldname": "task_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Task",
+   "reqd": 1
+  },
+  {
+   "description": "If set, only this user gets this step as a ToDo. Leave blank so everyone on the Project team table gets their own ToDo for this Task.",
+   "fieldname": "assigned_to",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Assign to",
+   "options": "User"
+  },
+  {
+   "fieldname": "instructions",
+   "fieldtype": "Text",
+   "label": "Instructions"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-04 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Earth Ent Trading",
+ "name": "ET Task Template Line",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

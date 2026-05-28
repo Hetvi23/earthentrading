@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "creation": "2026-05-28 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "transaction_id",
+  "commodity",
+  "origin",
+  "destination",
+  "role"
+ ],
+ "fields": [
+  {
+   "description": "Optional reference to an internal transaction / SO / Quotation.",
+   "fieldname": "transaction_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Transaction"
+  },
+  {
+   "fieldname": "commodity",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Commodity",
+   "reqd": 1
+  },
+  {
+   "fieldname": "origin",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Origin",
+   "options": "Country"
+  },
+  {
+   "fieldname": "destination",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Destination",
+   "options": "Country"
+  },
+  {
+   "fieldname": "role",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Role",
+   "options": "\nSeller\nBuyer\nBroker"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-28 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Earth Ent Trading",
+ "name": "ET Lead Trade Report",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

@@ -5,6 +5,8 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 from earthentrading.setup.custom_fields import CUSTOM_FIELDS
+from earthentrading.setup.lead_functions import ensure_lead_functions
+from earthentrading.setup.property_setters import ensure_property_setters
 from earthentrading.setup.roles import ensure_role_permissions, ensure_roles
 from earthentrading.setup.crm_workspace import (
 	ensure_earth_trading_workspace,
@@ -33,6 +35,14 @@ def after_migrate():
 
 def _install_all():
 	create_custom_fields(CUSTOM_FIELDS, update=True)
+	try:
+		ensure_property_setters()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_property_setters")
+	try:
+		ensure_lead_functions()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_lead_functions")
 	try:
 		migrate_trading_lines_data()
 	except Exception:

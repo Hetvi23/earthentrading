@@ -23,6 +23,14 @@ def execute():
 	if not frappe.db.exists("DocType", "ET Port"):
 		return
 
+	# Fresh install: no Custom Fields yet, no data to migrate. create_custom_fields()
+	# in after_migrate will set the port fields up directly as Link → ET Port.
+	if not (
+		frappe.db.exists("Custom Field", "Sales Order-custom_et_port_of_loading")
+		or frappe.db.exists("Custom Field", "Sales Order-custom_et_port_of_destination")
+	):
+		return
+
 	# 1. Make sure every port string already saved on Sales Orders exists as
 	#    an ET Port record (so the new Link doesn't dangle).
 	rows = frappe.db.sql(

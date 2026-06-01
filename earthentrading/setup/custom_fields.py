@@ -20,7 +20,7 @@ CUSTOM_FIELDS = {
 			"default": "Lead",
 			"insert_after": "custom_et_trading_section",
 			"in_list_view": 1,
-			"in_standard_filter": 1,
+			"in_standard_filter": 0,
 		},
 		{
 			"fieldname": "custom_et_lead_function",
@@ -58,7 +58,7 @@ CUSTOM_FIELDS = {
 			"options": "User",
 			"label": "Internal Broker",
 			"insert_after": "custom_et_brokers_cb",
-			"in_standard_filter": 1,
+			"in_standard_filter": 0,
 		},
 		{
 			"fieldname": "custom_et_external_broker",
@@ -67,7 +67,7 @@ CUSTOM_FIELDS = {
 			"label": "External Broker",
 			"insert_after": "custom_et_internal_broker",
 			"in_list_view": 1,
-			"in_standard_filter": 1,
+			"in_standard_filter": 0,
 		},
 		{
 			"fieldname": "custom_et_region",
@@ -97,7 +97,7 @@ CUSTOM_FIELDS = {
 			"label": "Deal Type",
 			"options": "\nBrokerage\nPrincipal",
 			"insert_after": "custom_et_lines",
-			"in_standard_filter": 1,
+			"in_standard_filter": 0,
 		},
 		{
 			"fieldname": "custom_et_incoterm",
@@ -238,31 +238,36 @@ CUSTOM_FIELDS = {
 			"options": "\nBrokerage\nPrincipal",
 			"insert_after": "custom_et_assigned_trader",
 		},
-		{
-			"fieldname": "custom_et_contract_type",
-			"fieldtype": "Select",
-			"label": "Contract Type",
-			"options": "\nBrokerage\nDirect (Back to Back)\nTo Seller\nTo Buyer",
-			"insert_after": "custom_et_deal_type",
-			"reqd": 1,
-			"in_standard_filter": 1,
-		},
+		# --- Top section additions to match the operations layout ----------
+		# Standard SO already has 3 columns in the Customer section
+		# (column_break_7 between order_type and transaction_date, and
+		# column_break1 between delivery_date and po_no). Just slot Buyer
+		# under order_type (col 1) and Contract Type under po_date (col 3).
 		{
 			"fieldname": "custom_et_buyer",
 			"fieldtype": "Link",
 			"options": "Customer",
 			"label": "Buyer",
 			"description": "End-buyer of the trade (use when Customer is a broker / intermediary).",
-			"insert_after": "custom_et_contract_type",
+			"insert_after": "order_type",
 			"reqd": 1,
 			"in_list_view": 1,
+			"in_standard_filter": 1,
+		},
+		{
+			"fieldname": "custom_et_contract_type",
+			"fieldtype": "Select",
+			"label": "Contract Type",
+			"options": "\nBrokerage\nDirect (Back to Back)\nTo Seller\nTo Buyer",
+			"insert_after": "po_date",
+			"reqd": 1,
 			"in_standard_filter": 1,
 		},
 		{
 			"fieldname": "custom_et_operations_section",
 			"fieldtype": "Section Break",
 			"label": "Operations",
-			"insert_after": "custom_et_buyer",
+			"insert_after": "custom_et_deal_type",
 			"collapsible": 0,
 		},
 		{
@@ -305,7 +310,8 @@ CUSTOM_FIELDS = {
 		},
 		{
 			"fieldname": "custom_et_port_of_loading",
-			"fieldtype": "Data",
+			"fieldtype": "Link",
+			"options": "ET Port",
 			"label": "Port Of Loading",
 			"insert_after": "custom_et_trade_payment",
 			"reqd": 1,
@@ -349,7 +355,8 @@ CUSTOM_FIELDS = {
 		},
 		{
 			"fieldname": "custom_et_port_of_destination",
-			"fieldtype": "Data",
+			"fieldtype": "Link",
+			"options": "ET Port",
 			"label": "Port of Destination",
 			"insert_after": "custom_et_destination",
 			"reqd": 1,

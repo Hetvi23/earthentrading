@@ -112,6 +112,13 @@ def _shortcuts(ws):
 
 	sc(type="DocType", link_to="ToDo", label="My todos", doc_view="List")
 
+	sc(
+		type="Dashboard",
+		link_to="Earth Trading Trades",
+		label="Trades dashboard",
+		color="Orange",
+		icon="dashboard",
+	)
 	sc(type="URL", url="/app/earth-trading-crm", label="Trading CRM workspace", color="Grey")
 	sc(type="URL", url="/earth-trading-lead", label="Public web lead form", color="Yellow", icon="globe")
 

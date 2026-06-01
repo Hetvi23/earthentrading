@@ -12,6 +12,8 @@ from frappe.custom.doctype.property_setter.property_setter import (
 
 # (doctype, fieldname, property, value, property_type)
 PROPERTY_SETTERS = [
+	# --- Lead status: trim to the three statuses we actually use ---
+	("Lead", "status", "options", "Open\nLead\nConverted", "Text"),
 	# --- Lead: hide standard fields that aren't useful for B2B trading ---
 	("Lead", "salutation", "hidden", "1", "Check"),
 	("Lead", "middle_name", "hidden", "1", "Check"),

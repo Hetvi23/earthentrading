@@ -26,7 +26,7 @@ add_to_apps_screen = [
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/earthentrading/css/earthentrading.css"
-# app_include_js = "/assets/earthentrading/js/earthentrading.js"
+app_include_js = ["/assets/earthentrading/js/trade_report_widget.js?v=3"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/earthentrading/css/earthentrading.css"
@@ -43,8 +43,8 @@ add_to_apps_screen = [
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {"Project": "public/js/project_list.js"}
+doctype_js = {"Sales Order": "public/js/sales_order_assign_prompt.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 

@@ -5,14 +5,17 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 from earthentrading.setup.custom_fields import CUSTOM_FIELDS
+from earthentrading.setup.dashboard import ensure_earth_trading_dashboard
 from earthentrading.setup.lead_functions import ensure_lead_functions
+from earthentrading.setup.ports import ensure_ports
 from earthentrading.setup.property_setters import ensure_property_setters
 from earthentrading.setup.roles import ensure_role_permissions, ensure_roles
 from earthentrading.setup.crm_workspace import (
 	ensure_earth_trading_workspace,
 	refresh_web_form_incoterm,
 )
-from earthentrading.setup.hub_workspace import ensure_earth_trading_hub_workspace
+from earthentrading.setup.selling_workspace import ensure_selling_workspace
+from earthentrading.setup.sidebar_cleanup import trim_public_sidebar
 from earthentrading.setup.kanban import ensure_lead_pipeline_kanban
 from earthentrading.setup.task_templates import ensure_task_templates
 from earthentrading.setup.migrate_trading_lines import run_all as migrate_trading_lines_data
@@ -44,6 +47,10 @@ def _install_all():
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_lead_functions")
 	try:
+		ensure_ports()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_ports")
+	try:
 		migrate_trading_lines_data()
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "earthentrading.migrate_trading_lines_data")
@@ -74,11 +81,19 @@ def _install_all():
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "earthentrading.refresh_web_form_incoterm")
 	try:
-		ensure_earth_trading_hub_workspace()
-	except Exception:
-		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_earth_trading_hub_workspace")
-	try:
 		ensure_earth_trading_workspace()
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_earth_trading_workspace")
+	try:
+		ensure_earth_trading_dashboard()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_earth_trading_dashboard")
+	try:
+		ensure_selling_workspace()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_selling_workspace")
+	try:
+		trim_public_sidebar()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.trim_public_sidebar")
 	frappe.clear_cache()

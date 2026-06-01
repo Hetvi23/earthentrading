@@ -3,17 +3,32 @@
 
 """Desk workspace: Earth Trading CRM dashboard (pipeline, capture, parties, engagement)."""
 
+import json
+import secrets
+
 import frappe
 
-from earthentrading.setup.kanban import BOARD_NAME
 from earthentrading.setup.workspace_editor import (
 	reload_workspace_into_doc_for_export,
-	sync_workspace_editorjs,
 )
 
 
+FUNCTION_SHORTCUT_LABELS = ["Leads", "Buyers", "Sellers", "Buyer-Seller", "Broker"]
+COMMODITY_SHORTCUT_LABELS = ["Pulses", "Spices", "Nuts", "Grains", "Sugar", "Feed", "Rice"]
+
+
 def ensure_earth_trading_workspace():
-	name = "Earth Trading CRM"
+	"""Take over the "CRM" workspace (Frappe CRM app's slot) with the trading
+	tiles + inline Trade Report filter, and remove the older "Earth Trading
+	CRM" workspace so only one CRM shows in the sidebar."""
+	name = "CRM"
+
+	# Clean up the previous Earth Trading CRM workspace if it still exists.
+	if frappe.db.exists("Workspace", "Earth Trading CRM"):
+		try:
+			frappe.delete_doc("Workspace", "Earth Trading CRM", force=True, ignore_permissions=True)
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), "earthentrading.delete_earth_trading_crm_workspace")
 
 	if frappe.db.exists("Workspace", name):
 		ws = frappe.get_doc("Workspace", name)
@@ -21,10 +36,9 @@ def ensure_earth_trading_workspace():
 		ws = frappe.new_doc("Workspace")
 		ws.label = name
 
-	ws.title = "Earth Trading CRM"
+	ws.title = "CRM"
 	ws.sequence_id = 4.7
 	ws.public = 1
-	ws.module = "Earth Ent Trading"
 	ws.icon = "organization"
 	ws.indicator_color = "green"
 	ws.is_hidden = 0
@@ -38,8 +52,54 @@ def ensure_earth_trading_workspace():
 	ws.charts = []
 
 	ws.save(ignore_permissions=True)
-	sync_workspace_editorjs(name, '<span class="h4"><b>Earth Trading CRM</b></span>')
+
+	# Build a custom EditorJS layout with two clearly separated tile groups
+	# (Function vs Commodity); the Trade Report widget is injected by JS.
+	ws.content = _build_grouped_content_json()
+	ws.save(ignore_permissions=True)
+
 	reload_workspace_into_doc_for_export(name)
+
+
+def _block_id() -> str:
+	return secrets.token_hex(6)
+
+
+def _build_grouped_content_json() -> str:
+	blocks: list[dict] = []
+
+	def push(**b):
+		blocks.append(b)
+
+	push(
+		id=_block_id(),
+		type="header",
+		data={"text": '<span class="h4"><b>Earth Trading CRM</b></span>', "col": 12},
+	)
+	push(id=_block_id(), type="spacer", data={"col": 12})
+
+	push(
+		id=_block_id(),
+		type="header",
+		data={"text": '<span class="h5"><b>Leads by function</b></span>', "col": 12},
+	)
+	for lab in FUNCTION_SHORTCUT_LABELS:
+		push(id=_block_id(), type="shortcut", data={"shortcut_name": lab, "col": 3})
+	push(id=_block_id(), type="spacer", data={"col": 12})
+
+	push(
+		id=_block_id(),
+		type="header",
+		data={"text": '<span class="h5"><b>Leads by commodity group</b></span>', "col": 12},
+	)
+	for lab in COMMODITY_SHORTCUT_LABELS:
+		push(id=_block_id(), type="shortcut", data={"shortcut_name": lab, "col": 3})
+
+	# The Trade Report filter widget is mounted by trade_report_widget.js
+	# directly after the last EditorJS block; it carries its own title, so
+	# no anchor header here (the empty header left a visible gap).
+
+	return json.dumps(blocks)
 
 
 def _shortcuts(ws):
@@ -48,143 +108,65 @@ def _shortcuts(ws):
 	def sc(**kwargs):
 		ws.append("shortcuts", kwargs)
 
-	sc(
-		type="DocType",
-		doc_view="Kanban",
-		link_to="Lead",
-		label="Lead pipeline board",
-		kanban_board=BOARD_NAME,
-		color="Green",
-		icon="organization",
-	)
+	# --- Row 1: Lead Function tiles -------------------------------------
 	sc(
 		type="DocType",
 		link_to="Lead",
-		label="All open leads",
+		label="Leads",
 		color="Blue",
-		format="{} open",
-		stats_filter='{"status": "Open"}',
+		format="{}",
 		doc_view="List",
 	)
-	sc(
-		type="DocType",
-		link_to="Lead",
-		label="My leads",
-		color="Orange",
-		format="{} mine",
-		stats_filter="{lead_owner: frappe.session.user}",
-		doc_view="List",
-	)
-	for stage, color in (
-		("Lead", "Blue"),
-		("Qualified", "Cyan"),
-		("Negotiation", "Pink"),
-		("Won", "Green"),
-		("Lost", "Red"),
+	for fn, color in (
+		("Buyer", "Blue"),
+		("Seller", "Blue"),
+		("Buyer-Seller", "Grey"),
+		("Broker", "Cyan"),
 	):
+		# Label tweak: pluralize Buyer/Seller to match the screenshot.
+		label = f"{fn}s" if fn in ("Buyer", "Seller") else fn
 		sc(
 			type="DocType",
 			link_to="Lead",
-			label=f"Stage: {stage}",
+			label=label,
 			color=color,
-			format="{} ",
-			stats_filter=frappe.as_json({"custom_et_sales_stage": stage}, indent=None),
+			format="{}",
+			stats_filter=frappe.as_json({"custom_et_lead_function": fn}, indent=None),
 			doc_view="List",
 		)
-	sc(
-		type="DocType",
-		link_to="Lead",
-		label="Brokerage",
-		color="Yellow",
-		format="{} ",
-		stats_filter='{"custom_et_deal_type": "Brokerage"}',
-		doc_view="List",
-	)
-	sc(
-		type="DocType",
-		link_to="Lead",
-		label="Principal",
-		color="Gray",
-		format="{} ",
-		stats_filter='{"custom_et_deal_type": "Principal"}',
-		doc_view="List",
-	)
 
-	sc(type="DocType", link_to="Opportunity", label="Opportunities", color="Purple", doc_view="List")
+	# --- Row 2+: Commodity Group tiles -----------------------------------
+	for group in ("Pulses", "Spices", "Nuts", "Grains", "Sugar", "Feed", "Rice"):
+		sc(
+			type="DocType",
+			link_to="Lead",
+			label=group,
+			color="Grey",
+			format="{}",
+			stats_filter=frappe.as_json({"custom_et_commodity_group": group}, indent=None),
+			doc_view="List",
+		)
 
-	sc(type="DocType", link_to="Communication", label="Communications log", doc_view="List")
-	sc(type="DocType", link_to="ToDo", label="Tasks & follow-ups", doc_view="List")
-
-	sc(type="URL", url="/earth-trading-lead", label="Public web lead form", color="Grey", icon="globe")
+	# Trade Report filter is rendered inline on the workspace by
+	# public/js/trade_report_widget.js — no shortcut needed here.
 
 
 def _links(ws):
+	# Workspace intentionally trimmed to the Trade Report filter only.
 	ws.links = []
-
-	def cb(label, icon=None):
-		ws.append("links", {"type": "Card Break", "label": label, "icon": icon or ""})
-
-	def ln(label, dt, onboard=0):
-		ws.append(
-			"links",
-			{
-				"type": "Link",
-				"label": label,
-				"link_type": "DocType",
-				"link_to": dt,
-				"onboard": onboard,
-				"is_query_report": 0,
-			},
-		)
-
-	def rep(label, report, ref_dt, onboard=0):
-		ws.append(
-			"links",
-			{
-				"type": "Link",
-				"label": label,
-				"link_type": "Report",
-				"link_to": report,
-				"dependencies": "",
-				"is_query_report": 1,
-				"onboard": onboard,
-				**({"report_ref_doctype": ref_dt} if ref_dt else {}),
-			},
-		)
-
-	cb("Lead capture & data")
-
-	ln("New Lead", "Lead")
-	ln("Data Import", "Data Import")
-
-	cb("Parties (buyers & suppliers)")
-	ln("Customer", "Customer")
-	ln("Supplier", "Supplier")
-	ln("Contact", "Contact")
-
-	cb("Quotations & documents")
-	ln("Quotation", "Quotation")
-	ln("Sales Order", "Sales Order")
-
-	if frappe.db.exists("DocType", "Contract"):
-		ln("Contract", "Contract")
-
-	cb("Operational checklists")
-	if frappe.db.exists("DocType", "ET Task Template"):
-		ln("Task templates", "ET Task Template")
-
-	cb("Analysis (standard CRM reports)")
-	if frappe.db.exists("Report", "Lead Details"):
-		rep("Lead Details", "Lead Details", "Lead")
-	if frappe.db.exists("Report", "Sales Pipeline Analytics"):
-		rep("Sales Pipeline Analytics", "Sales Pipeline Analytics", "Opportunity")
-	if frappe.db.exists("Report", "Opportunity Summary by Sales Stage"):
-		rep(
-			"Opportunity Summary by Sales Stage",
-			"Opportunity Summary by Sales Stage",
-			"Opportunity",
-		)
-
+	ws.append(
+		"links",
+		{
+			"type": "Link",
+			"label": "Leads by Trade Report",
+			"link_type": "Report",
+			"link_to": "Leads by Trade Report",
+			"dependencies": "",
+			"is_query_report": 1,
+			"onboard": 0,
+			"report_ref_doctype": "Lead",
+		},
+	)
 
 def refresh_web_form_incoterm():
 	"""Attach Incoterm to existing web forms if field was missing."""

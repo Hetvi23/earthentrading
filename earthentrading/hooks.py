@@ -26,7 +26,10 @@ add_to_apps_screen = [
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/earthentrading/css/earthentrading.css"
-app_include_js = ["/assets/earthentrading/js/trade_report_widget.js?v=3"]
+app_include_js = [
+	"/assets/earthentrading/js/trade_report_widget.js?v=3",
+	"/assets/earthentrading/js/selling_workspace_widget.js?v=1",
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/earthentrading/css/earthentrading.css"

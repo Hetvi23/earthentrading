@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.Python
+
+# Frontend / Node
+node_modules/
+.cache/
+dist/
+build/
+
+# Frappe / bench
+*.log
+sites/*
+.env
+.env.*
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

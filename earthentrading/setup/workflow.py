@@ -58,13 +58,14 @@ def ensure_workflow_prerequisites():
 		("ET Quote Approved", "Success"),
 		("ET Quote Rejected", "Danger"),
 		("ET SO Draft", "Warning"),
-		("ET SO Pending", "Primary"),
+		("ET SO Trader Review", "Primary"),
+		("ET SO Final Review", "Primary"),
 		("ET SO Approved", "Success"),
 		("ET SO Rejected", "Danger"),
 	):
 		_ensure_workflow_state(state, style)
 
-	for action in ("Send for Approval", "Approve", "Reject"):
+	for action in ("Send for Approval", "Send to Trader", "Send to Final", "Approve", "Reject"):
 		_ensure_workflow_action(action)
 
 
@@ -177,6 +178,10 @@ def ensure_quotation_workflow():
 
 
 def ensure_sales_order_workflow():
+	"""Conditional two-track SO approval:
+	- If custom_et_assigned_trader is set: Draft → Trader Review → Final Review → Approved/Rejected
+	- Otherwise: Draft → Final Review → Approved/Rejected
+	"""
 	document_type = "Sales Order"
 	existing = _active_workflow_for(document_type)
 	if existing:
@@ -189,7 +194,8 @@ def ensure_sales_order_workflow():
 			return
 
 	edit_role = "Sales User" if frappe.db.exists("Role", "Sales User") else "System Manager"
-	approver_roles = [r for r in ("Sales Manager", "ET Director") if frappe.db.exists("Role", r)] or ["System Manager"]
+	trader_role = "ET Trader" if frappe.db.exists("Role", "ET Trader") else "Sales Manager"
+	final_role = "ET Operations" if frappe.db.exists("Role", "ET Operations") else "Sales Manager"
 
 	name = "Earth Trading Sales Order"
 	if frappe.db.exists("Workflow", name):
@@ -204,44 +210,88 @@ def ensure_sales_order_workflow():
 	wf.send_email_alert = 0
 
 	wf.states = []
-	for st in ("ET SO Draft", "ET SO Pending", "ET SO Approved", "ET SO Rejected"):
+	for st in ("ET SO Draft", "ET SO Trader Review", "ET SO Final Review", "ET SO Rejected"):
 		wf.append("states", {"state": st, "doc_status": "0", "allow_edit": edit_role})
+	# Approved state auto-submits the SO (doc_status=1) when reached.
+	wf.append(
+		"states",
+		{"state": "ET SO Approved", "doc_status": "1", "allow_edit": edit_role},
+	)
 
 	wf.transitions = []
+
+	# Draft → Trader Review (when assigned trader is set)
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO Draft",
+			"action": "Send to Trader",
+			"next_state": "ET SO Trader Review",
+			"allowed": edit_role,
+			"condition": "doc.custom_et_assigned_trader",
+		},
+	)
+	# Draft → Final Review (when no assigned trader — skip trader step)
 	wf.append(
 		"transitions",
 		{
 			"state": "ET SO Draft",
 			"action": "Send for Approval",
-			"next_state": "ET SO Pending",
+			"next_state": "ET SO Final Review",
 			"allowed": edit_role,
+			"condition": "not doc.custom_et_assigned_trader",
 		},
 	)
-	for role in approver_roles:
-		wf.append(
-			"transitions",
-			{
-				"state": "ET SO Pending",
-				"action": "Approve",
-				"next_state": "ET SO Approved",
-				"allowed": role,
-			},
-		)
-		wf.append(
-			"transitions",
-			{
-				"state": "ET SO Pending",
-				"action": "Reject",
-				"next_state": "ET SO Rejected",
-				"allowed": role,
-			},
-		)
+
+	# Trader Review → Final Review (trader approves)
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO Trader Review",
+			"action": "Approve",
+			"next_state": "ET SO Final Review",
+			"allowed": trader_role,
+		},
+	)
+	# Trader Review → Rejected (trader rejects outright)
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO Trader Review",
+			"action": "Reject",
+			"next_state": "ET SO Rejected",
+			"allowed": trader_role,
+		},
+	)
+
+	# Final Review → Approved (operations finalises)
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO Final Review",
+			"action": "Approve",
+			"next_state": "ET SO Approved",
+			"allowed": final_role,
+		},
+	)
+	# Final Review → Rejected
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO Final Review",
+			"action": "Reject",
+			"next_state": "ET SO Rejected",
+			"allowed": final_role,
+		},
+	)
+
+	# Rejected → back to Draft so user can revise and resubmit
 	wf.append(
 		"transitions",
 		{
 			"state": "ET SO Rejected",
 			"action": "Send for Approval",
-			"next_state": "ET SO Pending",
+			"next_state": "ET SO Draft",
 			"allowed": edit_role,
 		},
 	)

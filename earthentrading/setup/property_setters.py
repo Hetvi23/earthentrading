@@ -56,6 +56,14 @@ PROPERTY_SETTERS = [
 	("Sales Order", "delivery_date", "reqd", "0", "Check"),
 	# Same for the items table's per-row delivery_date.
 	("Sales Order Item", "delivery_date", "reqd", "0", "Check"),
+	# po_no becomes a Link picker into existing Trade Contract Sales Orders.
+	# Only shown on Sales Contract orders (a Trade Contract IS the source,
+	# so it doesn't need to pick another SO). The dropdown filter is set
+	# client-side in sales_order_assign_prompt.js via frm.set_query.
+	("Sales Order", "po_no", "fieldtype", "Link", "Data"),
+	("Sales Order", "po_no", "options", "Sales Order", "Small Text"),
+	("Sales Order", "po_no", "depends_on", "eval:doc.order_type=='Sales Contract'", "Data"),
+	("Sales Order", "po_date", "depends_on", "eval:doc.order_type=='Sales Contract'", "Data"),
 	# --- Lead: hide standard tab breaks so all sections render under Details ---
 	# Six sections in order: (1) Person / Status, (2) Contact Info,
 	# (3) Address & Contact, (4) Organization, (5) Trading details + Trade

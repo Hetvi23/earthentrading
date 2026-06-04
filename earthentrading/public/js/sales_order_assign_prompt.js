@@ -1,10 +1,15 @@
-// On Sales Order creation, prompt Administrator / ET Operations users
-// asking whether they want to assign this SO to someone.
+// Sales Order client script — three concerns:
+//   1) On submit (final approval), prompt Admin / ET Ops to assign the SO.
+//   2) Customer Purchase Order picker: when Order Type = Sales Contract,
+//      the PO field is a Link → Sales Order filtered to Order Type =
+//      Trade Contract.
+//   3) On submitted SOs, add a "Create Project" button that runs
+//      earthentrading.api.project_from_so.create_from_sales_order.
 
 (function () {
 	const DEBUG = true;
 	function log(...args) {
-		if (DEBUG) console.log("[et-so-assign]", ...args);
+		if (DEBUG) console.log("[et-so-client]", ...args);
 	}
 	log("script loaded");
 
@@ -13,8 +18,23 @@
 	frappe.ui.form.on("Sales Order", {
 		refresh(frm) {
 			log("refresh", frm.doc.name, "docstatus=", frm.doc.docstatus, "ws=", frm.doc.workflow_state);
-			// Workflow approval submits server-side via apply_workflow and reloads
-			// the form — no client on_submit event fires. Detect the docstatus
+
+			// (2) Limit po_no to Trade Contract SOs when current SO is a
+			// Sales Contract. (po_no is a Link → Sales Order via property
+			// setter — see setup/property_setters.py.)
+			frm.set_query("po_no", () => ({
+				filters: { order_type: "Trade Contract", docstatus: 1 },
+			}));
+
+			// (3) Create Project button on submitted SOs.
+			if (frm.doc.docstatus === 1) {
+				frm.add_custom_button(__("Create Project"), () => {
+					openCreateProjectDialog(frm);
+				});
+			}
+
+			// (1) Workflow approval submits server-side via apply_workflow and
+			// reloads — no client on_submit event fires. Detect the docstatus
 			// 0 → 1 transition between refreshes here.
 			const prevKey = "__et_so_prev_status_" + frm.doc.name;
 			const prev = window[prevKey];
@@ -29,6 +49,65 @@
 			maybeOpenDialog(frm);
 		},
 	});
+
+	function openCreateProjectDialog(frm) {
+		const d = new frappe.ui.Dialog({
+			title: __("Create Project from {0}", [frm.doc.name]),
+			fields: [
+				{
+					fieldtype: "HTML",
+					fieldname: "intro",
+					options: `<p class="text-muted" style="margin-bottom:8px">
+						Customer, Company, Delivery Date are taken from this Sales Order.
+						Pick a checklist template and (optionally) an assignee.
+					</p>`,
+				},
+				{
+					fieldtype: "Link",
+					fieldname: "template",
+					label: __("ET Task Template"),
+					options: "ET Task Template",
+					reqd: 1,
+				},
+				{
+					fieldtype: "Link",
+					fieldname: "assignee",
+					label: __("Assign tasks to"),
+					options: "User",
+					get_query: () => ({
+						filters: { enabled: 1, user_type: "System User" },
+					}),
+				},
+			],
+			primary_action_label: __("Create"),
+			primary_action(values) {
+				frappe
+					.call({
+						method: "earthentrading.api.project_from_so.create_from_sales_order",
+						args: {
+							sales_order: frm.doc.name,
+							template: values.template,
+							assignee: values.assignee || null,
+						},
+					})
+					.then((r) => {
+						if (!r || !r.message) return;
+						d.hide();
+						const project = r.message.name;
+						const verb = r.message.created ? __("Created") : __("Found existing");
+						frappe.show_alert(
+							{
+								message: __("{0} project {1}", [verb, project]),
+								indicator: "green",
+							},
+							5
+						);
+						setTimeout(() => frappe.set_route("Form", "Project", project), 600);
+					});
+			},
+		});
+		d.show();
+	}
 
 	function maybeOpenDialog(frm) {
 		const reason = shouldPrompt(frm);

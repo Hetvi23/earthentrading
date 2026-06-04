@@ -21,7 +21,8 @@
   },
   {
    "fieldname": "commodity",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
+   "options": "Item",
    "in_list_view": 1,
    "label": "Commodity",
    "reqd": 1

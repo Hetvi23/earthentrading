@@ -5,7 +5,7 @@
 
 import frappe
 
-DEFAULT_FUNCTIONS = ["Buyer", "Seller", "Buyer-Seller", "Broker"]
+DEFAULT_FUNCTIONS = ["Buyer", "Seller", "Buyer-Seller", "Broker", "Trader"]
 
 
 def ensure_lead_functions():

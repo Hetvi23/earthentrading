@@ -21,7 +21,8 @@ PROPERTY_SETTERS = [
 	("Lead", "no_of_employees", "hidden", "1", "Check"),
 	("Lead", "annual_revenue", "hidden", "1", "Check"),
 	("Lead", "market_segment", "hidden", "1", "Check"),
-	("Lead", "qualification", "hidden", "1", "Check"),
+	# Keep qualification visible — user wants a Qualification section in the form.
+	("Lead", "qualification", "hidden", "0", "Check"),
 	("Lead", "blog_subscriber", "hidden", "1", "Check"),
 	("Lead", "fax", "hidden", "1", "Check"),
 	("Lead", "type", "hidden", "1", "Check"),
@@ -47,9 +48,25 @@ PROPERTY_SETTERS = [
 	("Sales Order", "delivery_date", "in_list_view", "1", "Check"),
 	("Sales Order", "order_type", "in_standard_filter", "1", "Check"),
 	("Sales Order", "company", "in_standard_filter", "1", "Check"),
-	# Buyer field already has in_list_view via custom_fields; Port of Destination
-	# and Total Quantity are also surfaced.
 	("Sales Order", "total_qty", "in_list_view", "1", "Check"),
+	# Order Type is restricted to Sales Contract / Trade Contract.
+	("Sales Order", "order_type", "options", "Sales Contract\nTrade Contract", "Text"),
+	# Delivery Date is no longer mandatory (trade contracts often have no
+	# defined delivery date until shipping is confirmed).
+	("Sales Order", "delivery_date", "reqd", "0", "Check"),
+	# Same for the items table's per-row delivery_date.
+	("Sales Order Item", "delivery_date", "reqd", "0", "Check"),
+	# --- Lead: hide standard tab breaks so all sections render under Details ---
+	# Six sections in order: (1) Person / Status, (2) Contact Info,
+	# (3) Address & Contact, (4) Organization, (5) Trading details + Trade
+	# Report, (6) Qualification. We flip the tab breaks to plain section
+	# breaks so the content flows as one continuous Details tab.
+	("Lead", "contact_info", "fieldtype", "Section Break", "Data"),
+	("Lead", "more_info", "fieldtype", "Section Break", "Data"),
+	("Lead", "connections_tab", "hidden", "1", "Check"),
+	# Friendly section labels matching the requested ordering.
+	("Lead", "contact_info", "label", "Contact info", "Data"),
+	("Lead", "more_info", "label", "Qualification", "Data"),
 ]
 
 

@@ -6,4 +6,5 @@
 # ET Port doctype must be synced (post_model_sync) before this patch flips
 # the Sales Order port fields to Link → ET Port.
 earthentrading.patches.migrate_port_fields_to_link
+earthentrading.patches.remove_lead_commodities_section
 earthentrading.patches.rebuild_earth_workspace_editor_content

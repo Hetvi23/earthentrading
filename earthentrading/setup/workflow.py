@@ -57,15 +57,32 @@ def ensure_workflow_prerequisites():
 		("ET Quote Pending", "Primary"),
 		("ET Quote Approved", "Success"),
 		("ET Quote Rejected", "Danger"),
+		# Sales Order — extended lifecycle.
 		("ET SO Draft", "Warning"),
 		("ET SO Trader Review", "Primary"),
 		("ET SO Final Review", "Primary"),
-		("ET SO Approved", "Success"),
+		("ET SO Pending Assignment", "Inverse"),
+		("ET SO In Progress", "Primary"),
+		("ET SO Raise Invoice", "Warning"),
+		("ET SO Completed", "Success"),
+		("ET SO Claim", "Danger"),
 		("ET SO Rejected", "Danger"),
 	):
 		_ensure_workflow_state(state, style)
 
-	for action in ("Send for Approval", "Send to Trader", "Send to Final", "Approve", "Reject"):
+	for action in (
+		"Send for Approval",
+		"Send to Trader",
+		"Send to Final",
+		"Approve",
+		"Reject",
+		"Assign Team Member",
+		"All Tasks Done",
+		"Mark Completed",
+		"Raise Claim",
+		"Resolve Claim",
+		"Resubmit",
+	):
 		_ensure_workflow_action(action)
 
 
@@ -178,9 +195,12 @@ def ensure_quotation_workflow():
 
 
 def ensure_sales_order_workflow():
-	"""Conditional two-track SO approval:
-	- If custom_et_assigned_trader is set: Draft → Trader Review → Final Review → Approved/Rejected
-	- Otherwise: Draft → Final Review → Approved/Rejected
+	"""Full SO lifecycle:
+	- Approval: Draft -> [Trader Review if assigned] -> Final Review -> Rejected (loop) | Pending Assignment (auto-submits, doc_status=1)
+	- Operations: Pending Assignment -> In Progress (operations assigns team member + creates project)
+	- Tasks: In Progress -> Raise Invoice (auto when all tasks complete)
+	- Billing: Raise Invoice -> Completed (auto when all linked Sales Invoices are paid)
+	- Post-completion: Completed -> Claim -> In Progress (operations adds tasks and resumes)
 	"""
 	document_type = "Sales Order"
 	existing = _active_workflow_for(document_type)
@@ -196,6 +216,7 @@ def ensure_sales_order_workflow():
 	edit_role = "Sales User" if frappe.db.exists("Role", "Sales User") else "System Manager"
 	trader_role = "ET Trader" if frappe.db.exists("Role", "ET Trader") else "Sales Manager"
 	final_role = "ET Operations" if frappe.db.exists("Role", "ET Operations") else "Sales Manager"
+	accounts_role = "Accounts User" if frappe.db.exists("Role", "Accounts User") else "System Manager"
 
 	name = "Earth Trading Sales Order"
 	if frappe.db.exists("Workflow", name):
@@ -209,18 +230,41 @@ def ensure_sales_order_workflow():
 	wf.workflow_state_field = "workflow_state"
 	wf.send_email_alert = 0
 
+	# ---- States ---------------------------------------------------------
 	wf.states = []
+	# Approval flow — doc_status=0 (draft, editable).
 	for st in ("ET SO Draft", "ET SO Trader Review", "ET SO Final Review", "ET SO Rejected"):
 		wf.append("states", {"state": st, "doc_status": "0", "allow_edit": edit_role})
-	# Approved state auto-submits the SO (doc_status=1) when reached.
+	# Pending Assignment — submitted (doc_status=1). Operations sees the SO here.
 	wf.append(
 		"states",
-		{"state": "ET SO Approved", "doc_status": "1", "allow_edit": edit_role},
+		{"state": "ET SO Pending Assignment", "doc_status": "1", "allow_edit": final_role},
+	)
+	# In Progress — operations has assigned a handler and project is running.
+	wf.append(
+		"states",
+		{"state": "ET SO In Progress", "doc_status": "1", "allow_edit": final_role},
+	)
+	# Raise Invoice — all project tasks done; accounts can now invoice.
+	wf.append(
+		"states",
+		{"state": "ET SO Raise Invoice", "doc_status": "1", "allow_edit": accounts_role},
+	)
+	# Completed — invoices paid. Read-only for most; ops can raise a claim.
+	wf.append(
+		"states",
+		{"state": "ET SO Completed", "doc_status": "1", "allow_edit": final_role},
+	)
+	# Claim — issue raised after completion. Project reopens with new tasks.
+	wf.append(
+		"states",
+		{"state": "ET SO Claim", "doc_status": "1", "allow_edit": final_role},
 	)
 
+	# ---- Transitions ----------------------------------------------------
 	wf.transitions = []
 
-	# Draft → Trader Review (when assigned trader is set)
+	# --- Approval phase ---
 	wf.append(
 		"transitions",
 		{
@@ -231,7 +275,6 @@ def ensure_sales_order_workflow():
 			"condition": "doc.custom_et_assigned_trader",
 		},
 	)
-	# Draft → Final Review (when no assigned trader — skip trader step)
 	wf.append(
 		"transitions",
 		{
@@ -242,8 +285,6 @@ def ensure_sales_order_workflow():
 			"condition": "not doc.custom_et_assigned_trader",
 		},
 	)
-
-	# Trader Review → Final Review (trader approves)
 	wf.append(
 		"transitions",
 		{
@@ -253,7 +294,6 @@ def ensure_sales_order_workflow():
 			"allowed": trader_role,
 		},
 	)
-	# Trader Review → Rejected (trader rejects outright)
 	wf.append(
 		"transitions",
 		{
@@ -263,18 +303,15 @@ def ensure_sales_order_workflow():
 			"allowed": trader_role,
 		},
 	)
-
-	# Final Review → Approved (operations finalises)
 	wf.append(
 		"transitions",
 		{
 			"state": "ET SO Final Review",
 			"action": "Approve",
-			"next_state": "ET SO Approved",
+			"next_state": "ET SO Pending Assignment",
 			"allowed": final_role,
 		},
 	)
-	# Final Review → Rejected
 	wf.append(
 		"transitions",
 		{
@@ -284,15 +321,70 @@ def ensure_sales_order_workflow():
 			"allowed": final_role,
 		},
 	)
-
-	# Rejected → back to Draft so user can revise and resubmit
 	wf.append(
 		"transitions",
 		{
 			"state": "ET SO Rejected",
-			"action": "Send for Approval",
+			"action": "Resubmit",
 			"next_state": "ET SO Draft",
 			"allowed": edit_role,
+		},
+	)
+
+	# --- Operations phase ---
+	# Pending Assignment -> In Progress is fired by api.operations.assign_team_member
+	# (JS "Assign Team Member" button on the SO form). Still listed here so the
+	# workflow board shows the transition path.
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO Pending Assignment",
+			"action": "Assign Team Member",
+			"next_state": "ET SO In Progress",
+			"allowed": final_role,
+		},
+	)
+	# In Progress -> Raise Invoice fires from events.task.on_update when every
+	# task in the linked project is Completed. Listed here for the board.
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO In Progress",
+			"action": "All Tasks Done",
+			"next_state": "ET SO Raise Invoice",
+			"allowed": final_role,
+		},
+	)
+
+	# --- Billing phase ---
+	# Raise Invoice -> Completed fires from events.sales_invoice when all SIs paid.
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO Raise Invoice",
+			"action": "Mark Completed",
+			"next_state": "ET SO Completed",
+			"allowed": accounts_role,
+		},
+	)
+
+	# --- Claim phase ---
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO Completed",
+			"action": "Raise Claim",
+			"next_state": "ET SO Claim",
+			"allowed": final_role,
+		},
+	)
+	wf.append(
+		"transitions",
+		{
+			"state": "ET SO Claim",
+			"action": "Resolve Claim",
+			"next_state": "ET SO In Progress",
+			"allowed": final_role,
 		},
 	)
 

@@ -162,6 +162,19 @@ doc_events = {
 		"after_insert": "earthentrading.events.project.after_insert",
 		"on_update": "earthentrading.events.project.on_update",
 	},
+	"Task": {
+		# Auto-transition linked SO to "Raise Invoice" once every task on the
+		# project is Completed/Cancelled.
+		"on_update": "earthentrading.events.task.on_update",
+	},
+	"Sales Invoice": {
+		# Detect "all invoices paid" → flip linked SO to "Completed".
+		"on_submit": "earthentrading.events.sales_invoice.on_submit",
+		"on_update_after_submit": "earthentrading.events.sales_invoice.on_update_after_submit",
+	},
+	"Payment Entry": {
+		"on_submit": "earthentrading.events.sales_invoice.on_payment_entry_submit",
+	},
 }
 
 # Scheduled Tasks
@@ -195,6 +208,7 @@ doc_events = {
 #
 override_whitelisted_methods = {
 	"erpnext.crm.doctype.lead.lead.make_opportunity": "earthentrading.overrides.lead.make_opportunity",
+	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "earthentrading.overrides.sales_order.make_sales_invoice",
 }
 
 # each overriding function accepts a `data` argument;

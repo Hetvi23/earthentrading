@@ -9,20 +9,83 @@ from earthentrading.utils import (
 	is_earth_trading_sales_order_workflow_active,
 )
 
+# States that mean the SO has cleared approval. before_submit lets any of
+# these through (only "Pending Assignment" actually flips docstatus=1 the
+# first time, but a doc could land in In Progress / Raise Invoice / etc.
+# from later transitions).
+POST_APPROVAL_STATES = {
+	"ET SO Pending Assignment",
+	"ET SO In Progress",
+	"ET SO Raise Invoice",
+	"ET SO Completed",
+	"ET SO Claim",
+}
+
 
 def validate(doc, method):
 	_sync_assigned_trader_from_items(doc)
+	_send_email_on_final_approval(doc)
 
 
 def before_submit(doc, method):
 	if is_earth_trading_sales_order_workflow_active():
 		ws = doc.get("workflow_state")
-		if ws != "ET SO Approved":
+		if ws not in POST_APPROVAL_STATES:
 			frappe.throw(
-				_("Sales Order can only be submitted after workflow approval (current: {0}).").format(ws or _("unset"))
+				_(
+					"Sales Order can only be submitted after workflow approval "
+					"(current: {0})."
+				).format(ws or _("unset"))
 			)
 	if is_earth_trading_quotation_workflow_active():
 		_validate_linked_quotations_approved(doc)
+
+
+def _send_email_on_final_approval(doc):
+	"""Stub: fire a placeholder email when the SO transitions from Final
+	Review to Pending Assignment (i.e. trade manager just approved). Real
+	buyer/seller email templates will be wired in once provided."""
+	if not is_earth_trading_sales_order_workflow_active():
+		return
+	if doc.is_new():
+		return
+	previous = doc.get_doc_before_save()
+	if not previous:
+		return
+	prev_state = previous.get("workflow_state")
+	new_state = doc.get("workflow_state")
+	if prev_state == "ET SO Final Review" and new_state == "ET SO Pending Assignment":
+		_send_approval_email_stub(doc)
+
+
+def _send_approval_email_stub(doc):
+	recipients: list[str] = []
+	# Customer's primary contact, if resolvable
+	if doc.get("contact_email"):
+		recipients.append(doc.contact_email)
+	# Fallback: lead_owner / owner of the SO
+	if not recipients and doc.get("owner"):
+		recipients.append(doc.owner)
+	if not recipients:
+		return
+	subject = _("Sales Order {0} approved").format(doc.name)
+	message = _(
+		"<p>Sales Order <b>{0}</b> has been approved by the Trade Manager.</p>"
+		"<p>Operations will assign a handler shortly.</p>"
+		"<p><i>This is a placeholder notification. Final buyer/seller email "
+		"templates are pending and will be wired in by Earth Trading admins.</i></p>"
+	).format(doc.name)
+	try:
+		frappe.sendmail(
+			recipients=recipients,
+			subject=subject,
+			message=message,
+			reference_doctype="Sales Order",
+			reference_name=doc.name,
+			now=False,
+		)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.sales_order.approval_email")
 
 
 def _sync_assigned_trader_from_items(doc):

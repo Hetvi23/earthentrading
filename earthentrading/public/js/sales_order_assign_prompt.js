@@ -26,11 +26,10 @@
 				filters: { order_type: "Trade Contract", docstatus: 1 },
 			}));
 
-			// (3) Create Project button on submitted SOs.
+			// (3) State-driven action buttons on submitted SOs.
 			if (frm.doc.docstatus === 1) {
-				frm.add_custom_button(__("Create Project"), () => {
-					openCreateProjectDialog(frm);
-				});
+				addLifecycleButtons(frm);
+				hideStandardInvoiceButtonIfBlocked(frm);
 			}
 
 			// (1) Workflow approval submits server-side via apply_workflow and
@@ -49,6 +48,152 @@
 			maybeOpenDialog(frm);
 		},
 	});
+
+	function addLifecycleButtons(frm) {
+		const ws = frm.doc.workflow_state;
+
+		if (ws === "ET SO Pending Assignment" || ws === "ET SO Claim") {
+			frm.add_custom_button(
+				ws === "ET SO Claim" ? __("Reassign / Add Tasks") : __("Assign Team Member"),
+				() => openAssignTeamMemberDialog(frm),
+				__("Operations")
+			);
+		}
+
+		if (ws === "ET SO Completed") {
+			frm.add_custom_button(
+				__("Raise Claim"),
+				() => openRaiseClaimDialog(frm),
+				__("Operations")
+			);
+		}
+
+		if (ws === "ET SO Claim") {
+			frm.add_custom_button(
+				__("Resolve Claim"),
+				() => {
+					frappe.confirm(__("Mark claim resolved and resume operations?"), () => {
+						frappe
+							.call({
+								method: "earthentrading.api.operations.resolve_claim",
+								args: { sales_order: frm.docname },
+							})
+							.then(() => {
+								frappe.show_alert({ message: __("Claim resolved"), indicator: "green" }, 5);
+								frm.reload_doc();
+							});
+					});
+				},
+				__("Operations")
+			);
+		}
+	}
+
+	function hideStandardInvoiceButtonIfBlocked(frm) {
+		// The standard ERPNext "Create > Sales Invoice" menu item is only
+		// allowed when the SO is in Raise Invoice state. Hide it otherwise.
+		if (frm.doc.workflow_state === "ET SO Raise Invoice") return;
+		setTimeout(() => {
+			frm.page.menu
+				.find("a.dropdown-item")
+				.filter((_, el) => /^\s*Sales Invoice\s*$/i.test($(el).text()))
+				.parent()
+				.hide();
+			// Same for the inner "Create" dropdown that ERPNext sometimes uses.
+			$("button.btn-default")
+				.parent()
+				.find("a.grey-link, a.dropdown-item")
+				.filter((_, el) => /Sales Invoice/i.test($(el).text()))
+				.hide();
+		}, 200);
+	}
+
+	function openAssignTeamMemberDialog(frm) {
+		const d = new frappe.ui.Dialog({
+			title: __("Assign team member for {0}", [frm.doc.name]),
+			fields: [
+				{
+					fieldtype: "HTML",
+					fieldname: "intro",
+					options: `<p class="text-muted" style="margin-bottom:8px">
+						Operations: pick the team member who will own this SO,
+						and the task checklist template. The user gets read+write
+						on the SO via ToDo + Share. The project gets created with
+						the picked template and the user as an assignee.
+					</p>`,
+				},
+				{
+					fieldtype: "Link",
+					fieldname: "assignee",
+					label: __("Assign to"),
+					options: "User",
+					reqd: 1,
+					get_query: () => ({
+						filters: { enabled: 1, user_type: "System User" },
+					}),
+				},
+				{
+					fieldtype: "Link",
+					fieldname: "template",
+					label: __("ET Task Template"),
+					options: "ET Task Template",
+					reqd: 1,
+				},
+			],
+			primary_action_label: __("Assign"),
+			primary_action(values) {
+				frappe
+					.call({
+						method: "earthentrading.api.operations.assign_team_member",
+						args: {
+							sales_order: frm.docname,
+							user: values.assignee,
+							template: values.template,
+						},
+					})
+					.then((r) => {
+						if (!r || !r.message) return;
+						d.hide();
+						frappe.show_alert(
+							{
+								message: __("Assigned to {0}", [values.assignee]),
+								indicator: "green",
+							},
+							5
+						);
+						frm.reload_doc();
+					});
+			},
+		});
+		d.show();
+	}
+
+	function openRaiseClaimDialog(frm) {
+		const d = new frappe.ui.Dialog({
+			title: __("Raise claim on {0}", [frm.doc.name]),
+			fields: [
+				{
+					fieldtype: "Small Text",
+					fieldname: "note",
+					label: __("Reason / details"),
+				},
+			],
+			primary_action_label: __("Raise Claim"),
+			primary_action(values) {
+				frappe
+					.call({
+						method: "earthentrading.api.operations.raise_claim",
+						args: { sales_order: frm.docname, note: values.note || null },
+					})
+					.then(() => {
+						d.hide();
+						frappe.show_alert({ message: __("Claim raised"), indicator: "orange" }, 5);
+						frm.reload_doc();
+					});
+			},
+		});
+		d.show();
+	}
 
 	function openCreateProjectDialog(frm) {
 		const d = new frappe.ui.Dialog({

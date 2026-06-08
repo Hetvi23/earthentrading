@@ -7,6 +7,7 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from earthentrading.setup.custom_fields import CUSTOM_FIELDS
 from earthentrading.setup.dashboard import ensure_earth_trading_dashboard
 from earthentrading.setup.lead_functions import ensure_lead_functions
+from earthentrading.setup.lead_layout import apply_lead_layout
 from earthentrading.setup.ports import ensure_ports
 from earthentrading.setup.property_setters import ensure_property_setters
 from earthentrading.setup.roles import ensure_role_permissions, ensure_roles
@@ -42,6 +43,10 @@ def _install_all():
 		ensure_property_setters()
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_property_setters")
+	try:
+		apply_lead_layout()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.apply_lead_layout")
 	try:
 		ensure_lead_functions()
 	except Exception:

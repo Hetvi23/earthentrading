@@ -15,6 +15,8 @@ sequence we want, then drops our Trading sections in before
 Qualification.
 """
 
+import json
+
 import frappe
 from frappe.custom.doctype.property_setter.property_setter import (
 	make_property_setter,
@@ -116,7 +118,19 @@ LEAD_FIELD_ORDER = [
 
 def apply_lead_layout():
 	"""Compute the final ordered field list (intersected with what actually
-	exists on this site's Lead meta) and write it as a Property Setter."""
+	exists on this site's Lead meta) and write it as a Property Setter.
+
+	Defensively wipe any pre-existing field_order Property Setter first —
+	an earlier release of this module stored the value newline-separated
+	instead of JSON, which makes frappe.get_meta("Lead") throw
+	JSONDecodeError. Self-heal by clearing it before we try to load meta.
+	"""
+	frappe.db.sql(
+		"DELETE FROM `tabProperty Setter` WHERE doc_type='Lead' AND property='field_order'"
+	)
+	frappe.db.commit()
+	frappe.clear_cache(doctype="Lead")
+
 	meta = frappe.get_meta("Lead")
 	existing = {df.fieldname for df in meta.fields}
 
@@ -126,11 +140,15 @@ def apply_lead_layout():
 		if f not in ordered:
 			ordered.append(f)
 
+	# Frappe's Meta.sort_fields does json.loads(field_order) — so the value
+	# must be a JSON-encoded list, not newline-separated. The previous
+	# release stored newlines and broke every Lead form load with
+	# JSONDecodeError.
 	make_property_setter(
 		"Lead",
 		"",
 		"field_order",
-		"\n".join(ordered),
+		json.dumps(ordered),
 		"Small Text",
 		for_doctype=True,
 		validate_fields_for_doctype=False,

@@ -31,9 +31,17 @@ def spawn_et_checklist_from_project(doc) -> None:
 	"""Insert one ERPNext Task per template line; allocate ToDos to team or row assignee."""
 	if not doc.get("custom_et_task_template"):
 		return
+	if doc.status == "Cancelled":
+		return
+	# Idempotency guard. This runs from Project.after_insert AND Project.on_update
+	# (both fire within a single insert), plus the explicit callers in
+	# api/operations.py and api/project_from_so.py — up to 3 calls per request.
+	# The in-memory flag goes stale after db.set_value(update_modified=False),
+	# so re-read the persisted value before spawning, or we'd duplicate every
+	# task (and its ToDo assignment).
 	if doc.get("custom_et_checklist_spawned"):
 		return
-	if doc.status == "Cancelled":
+	if doc.name and frappe.db.get_value("Project", doc.name, "custom_et_checklist_spawned"):
 		return
 
 	tpl_key = frappe.db.exists("ET Task Template", doc.custom_et_task_template)
@@ -96,6 +104,8 @@ def spawn_et_checklist_from_project(doc) -> None:
 			1,
 			update_modified=False,
 		)
+		# Keep the in-memory doc in sync so same-request callers also short-circuit.
+		doc.custom_et_checklist_spawned = 1
 		try:
 			frappe.get_doc("Project", doc.name).update_project()
 		except Exception:

@@ -9,9 +9,12 @@ def _roles(user: str) -> set[str]:
 
 
 def _is_et_trader(user: str) -> bool:
-	return "ET Trader" in _roles(user) and "ET Director" not in _roles(user) and "System Manager" not in _roles(
-		user
-	)
+	"""A scoped trader: holds ET Trader but not a role with full visibility
+	(Director / Trader Manager / System Manager all see every record)."""
+	roles = _roles(user)
+	if not {"ET Director", "ET Trader Manager", "System Manager"}.isdisjoint(roles):
+		return False
+	return "ET Trader" in roles
 
 
 def lead_query_conditions(user: str | None) -> str | None:

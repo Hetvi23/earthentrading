@@ -214,7 +214,9 @@ def ensure_sales_order_workflow():
 			return
 
 	edit_role = "Sales User" if frappe.db.exists("Role", "Sales User") else "System Manager"
-	trader_role = "ET Trader" if frappe.db.exists("Role", "ET Trader") else "Sales Manager"
+	# Trader Review is approved by the Trader Manager (a tier above the deal's
+	# trader), not the ET Trader who owns the deal.
+	trader_mgr_role = "ET Trader Manager" if frappe.db.exists("Role", "ET Trader Manager") else "Sales Manager"
 	final_role = "ET Operations" if frappe.db.exists("Role", "ET Operations") else "Sales Manager"
 	accounts_role = "Accounts User" if frappe.db.exists("Role", "Accounts User") else "System Manager"
 
@@ -291,7 +293,7 @@ def ensure_sales_order_workflow():
 			"state": "Trader Review",
 			"action": "Approve",
 			"next_state": "Final Review",
-			"allowed": trader_role,
+			"allowed": trader_mgr_role,
 		},
 	)
 	wf.append(
@@ -300,7 +302,7 @@ def ensure_sales_order_workflow():
 			"state": "Trader Review",
 			"action": "Reject",
 			"next_state": "Rejected",
-			"allowed": trader_role,
+			"allowed": trader_mgr_role,
 		},
 	)
 	wf.append(

@@ -4,7 +4,7 @@
 import frappe
 from frappe.permissions import add_permission
 
-ET_ROLES = ("ET Director", "ET Trader", "ET Operations")
+ET_ROLES = ("ET Director", "ET Trader", "ET Trader Manager", "ET Operations")
 
 
 def ensure_roles():
@@ -85,11 +85,13 @@ def ensure_role_permissions():
 	for dt in crm:
 		_upsert_custom_docperm(dt, "ET Director", full)
 		_upsert_custom_docperm(dt, "ET Trader", trader)
+		_upsert_custom_docperm(dt, "ET Trader Manager", trader)
 
 	party = ("Customer", "Supplier", "Contact")
 	for dt in ("Task",):
 		_upsert_custom_docperm(dt, "ET Director", full)
 		_upsert_custom_docperm(dt, "ET Trader", trader)
+		_upsert_custom_docperm(dt, "ET Trader Manager", trader)
 		_upsert_custom_docperm(dt, "ET Operations", read_only)
 
 	for dt in ("Lead", "Opportunity", "Project"):
@@ -98,6 +100,7 @@ def ensure_role_permissions():
 	for dt in party:
 		_upsert_custom_docperm(dt, "ET Director", full)
 		_upsert_custom_docperm(dt, "ET Trader", trader)
+		_upsert_custom_docperm(dt, "ET Trader Manager", trader)
 		_upsert_custom_docperm(dt, "ET Operations", read_only)
 
 	for dt in ("Quotation",):
@@ -107,6 +110,7 @@ def ensure_role_permissions():
 	if frappe.db.exists("DocType", "ET Task Template"):
 		_upsert_custom_docperm("ET Task Template", "ET Director", full)
 		_upsert_custom_docperm("ET Task Template", "ET Trader", trader)
+		_upsert_custom_docperm("ET Task Template", "ET Trader Manager", trader)
 		_upsert_custom_docperm("ET Task Template", "ET Operations", read_only)
 
 	for role in ET_ROLES:

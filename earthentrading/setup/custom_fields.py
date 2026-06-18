@@ -361,8 +361,7 @@ CUSTOM_FIELDS = {
 			"fieldtype": "Data",
 			"label": "Packaging",
 			"insert_after": "item_name",
-			"in_list_view": 1,
-			"columns": 2,
+			"in_list_view": 0,
 		},
 		{
 			"fieldname": "custom_et_shipping_start",
@@ -385,8 +384,7 @@ CUSTOM_FIELDS = {
 			"fieldtype": "Currency",
 			"label": "Traded Price",
 			"insert_after": "rate",
-			"in_list_view": 1,
-			"columns": 1,
+			"in_list_view": 0,
 		},
 	],
 	"Project": [

@@ -60,6 +60,10 @@ PROPERTY_SETTERS = [
 	("Sales Order", "delivery_date", "reqd", "0", "Check"),
 	# Same for the items table's per-row delivery_date.
 	("Sales Order Item", "delivery_date", "reqd", "0", "Check"),
+	# Keep the Items grid to: Item Code, Shipping Start/End, Qty, Rate, Amount —
+	# hide delivery_date and warehouse columns (still editable in the row).
+	("Sales Order Item", "delivery_date", "in_list_view", "0", "Check"),
+	("Sales Order Item", "warehouse", "in_list_view", "0", "Check"),
 	# po_no becomes a Link picker into existing Trade Contract Sales Orders.
 	# Only shown on Sales Contract orders (a Trade Contract IS the source,
 	# so it doesn't need to pick another SO). The dropdown filter is set

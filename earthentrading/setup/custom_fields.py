@@ -217,11 +217,19 @@ CUSTOM_FIELDS = {
 			"insert_after": "custom_et_trading_section",
 		},
 		{
+			"fieldname": "custom_et_co_trader",
+			"fieldtype": "Link",
+			"options": "User",
+			"label": "Co-Trader",
+			"description": "Second trader sharing this deal (optional).",
+			"insert_after": "custom_et_assigned_trader",
+		},
+		{
 			"fieldname": "custom_et_deal_type",
 			"fieldtype": "Select",
 			"label": "Deal Type",
 			"options": "\nBrokerage\nPrincipal",
-			"insert_after": "custom_et_assigned_trader",
+			"insert_after": "custom_et_co_trader",
 		},
 		# --- Top section additions to match the operations layout ----------
 		# Standard SO already has 3 columns in the Customer section

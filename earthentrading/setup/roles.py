@@ -100,7 +100,7 @@ def ensure_role_permissions():
 		_upsert_custom_docperm(dt, "ET Trader", trader)
 		_upsert_custom_docperm(dt, "ET Operations", read_only)
 
-	for dt in ("Quotation", "Sales Order"):
+	for dt in ("Quotation",):
 		_upsert_custom_docperm(dt, "ET Operations", read_only)
 
 	# Task templates (checklists) — DocType may not exist on very first hook pass
@@ -114,3 +114,34 @@ def ensure_role_permissions():
 			add_permission("User", role, 0, "read")
 		except Exception:
 			pass
+
+	# --- Functional workflow roles -------------------------------------------
+	# The Sales Order / Quotation workflows act through standard roles
+	# (edit_role = "Sales User", accounts_role = "Accounts User"), and
+	# "ET Operations" is the Final-Review approver. Because the ET Custom
+	# DocPerms above REPLACE each doctype's standard permissions, these roles
+	# must be granted access here or they cannot act on the very documents the
+	# workflow assigns to them (e.g. a Sales User couldn't create the SO, and
+	# ET Operations couldn't submit it at Final Review).
+	def _perm(dt, role, perm):
+		if frappe.db.exists("Role", role):
+			_upsert_custom_docperm(dt, role, perm)
+
+	creator = {
+		"read": 1, "write": 1, "create": 1, "submit": 1, "cancel": 1,
+		"amend": 1, "print": 1, "email": 1, "export": 1, "report": 1, "share": 1,
+	}
+	for dt in ("Sales Order", "Quotation"):
+		_perm(dt, "Sales User", creator)
+	for dt in ("Customer", "Supplier", "Contact"):
+		_perm(dt, "Sales User", {"read": 1, "write": 1, "create": 1, "report": 1, "export": 1})
+
+	# Accounts (billing): read/update the SO to invoice it and "Mark Completed".
+	_perm("Sales Order", "Accounts User",
+		{"read": 1, "write": 1, "report": 1, "export": 1, "print": 1, "email": 1})
+	_perm("Customer", "Accounts User", read_only)
+
+	# ET Operations approves Final Review, which SUBMITS the SO -> needs submit.
+	_perm("Sales Order", "ET Operations",
+		{"read": 1, "write": 1, "submit": 1, "cancel": 1, "amend": 1,
+		 "report": 1, "export": 1, "print": 1, "email": 1})

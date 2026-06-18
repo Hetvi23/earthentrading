@@ -49,6 +49,11 @@ def sales_order_query_conditions(user: str | None) -> str | None:
 	if not _is_et_trader(user):
 		return None
 	u = frappe.db.escape(user)
+	# A trader sees their own deals (assigned to them or created by them) plus
+	# the shared "Trader Review" queue — any SO currently awaiting a trader's
+	# approval, so it can be picked up regardless of who it's assigned to.
 	return (
-		f"(`tabSales Order`.`custom_et_assigned_trader` = {u} OR `tabSales Order`.`owner` = {u})"
+		f"(`tabSales Order`.`custom_et_assigned_trader` = {u} "
+		f"OR `tabSales Order`.`owner` = {u} "
+		f"OR `tabSales Order`.`workflow_state` = 'Trader Review')"
 	)

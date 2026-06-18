@@ -53,20 +53,20 @@ def _deactivate_other_workflows(document_type: str, keep_name: str):
 
 def ensure_workflow_prerequisites():
 	for state, style in (
-		("ET Quote Draft", "Warning"),
-		("ET Quote Pending", "Primary"),
-		("ET Quote Approved", "Success"),
-		("ET Quote Rejected", "Danger"),
+		("Quote Draft", "Warning"),
+		("Quote Pending", "Primary"),
+		("Quote Approved", "Success"),
+		("Quote Rejected", "Danger"),
 		# Sales Order — extended lifecycle.
-		("ET SO Draft", "Warning"),
-		("ET SO Trader Review", "Primary"),
-		("ET SO Final Review", "Primary"),
-		("ET SO Pending Assignment", "Inverse"),
-		("ET SO In Progress", "Primary"),
-		("ET SO Raise Invoice", "Warning"),
-		("ET SO Completed", "Success"),
-		("ET SO Claim", "Danger"),
-		("ET SO Rejected", "Danger"),
+		("Draft", "Warning"),
+		("Trader Review", "Primary"),
+		("Final Review", "Primary"),
+		("Pending Assignment", "Inverse"),
+		("In Progress", "Primary"),
+		("Raise Invoice", "Warning"),
+		("Completed", "Success"),
+		("Claim", "Danger"),
+		("Rejected", "Danger"),
 	):
 		_ensure_workflow_state(state, style)
 
@@ -119,7 +119,7 @@ def ensure_quotation_workflow():
 	wf.append(
 		"states",
 		{
-			"state": "ET Quote Draft",
+			"state": "Quote Draft",
 			"doc_status": "0",
 			"allow_edit": edit_role,
 		},
@@ -127,7 +127,7 @@ def ensure_quotation_workflow():
 	wf.append(
 		"states",
 		{
-			"state": "ET Quote Pending",
+			"state": "Quote Pending",
 			"doc_status": "0",
 			"allow_edit": edit_role,
 		},
@@ -135,7 +135,7 @@ def ensure_quotation_workflow():
 	wf.append(
 		"states",
 		{
-			"state": "ET Quote Approved",
+			"state": "Quote Approved",
 			"doc_status": "0",
 			"allow_edit": edit_role,
 		},
@@ -143,7 +143,7 @@ def ensure_quotation_workflow():
 	wf.append(
 		"states",
 		{
-			"state": "ET Quote Rejected",
+			"state": "Quote Rejected",
 			"doc_status": "0",
 			"allow_edit": edit_role,
 		},
@@ -153,9 +153,9 @@ def ensure_quotation_workflow():
 	wf.append(
 		"transitions",
 		{
-			"state": "ET Quote Draft",
+			"state": "Quote Draft",
 			"action": "Send for Approval",
-			"next_state": "ET Quote Pending",
+			"next_state": "Quote Pending",
 			"allowed": edit_role,
 		},
 	)
@@ -163,27 +163,27 @@ def ensure_quotation_workflow():
 		wf.append(
 			"transitions",
 			{
-				"state": "ET Quote Pending",
+				"state": "Quote Pending",
 				"action": "Approve",
-				"next_state": "ET Quote Approved",
+				"next_state": "Quote Approved",
 				"allowed": role,
 			},
 		)
 		wf.append(
 			"transitions",
 			{
-				"state": "ET Quote Pending",
+				"state": "Quote Pending",
 				"action": "Reject",
-				"next_state": "ET Quote Rejected",
+				"next_state": "Quote Rejected",
 				"allowed": role,
 			},
 		)
 	wf.append(
 		"transitions",
 		{
-			"state": "ET Quote Rejected",
+			"state": "Quote Rejected",
 			"action": "Send for Approval",
-			"next_state": "ET Quote Pending",
+			"next_state": "Quote Pending",
 			"allowed": edit_role,
 		},
 	)
@@ -200,7 +200,7 @@ def ensure_sales_order_workflow():
 	- Operations: Pending Assignment -> In Progress (operations assigns team member + creates project)
 	- Tasks: In Progress -> Raise Invoice (auto when all tasks complete)
 	- Billing: Raise Invoice -> Completed (auto when all linked Sales Invoices are paid)
-	- Post-completion: Completed -> Claim -> In Progress (operations adds tasks and resumes)
+	- Post-completion: Completed -> Claim -> Completed (resolve simply closes it again)
 	"""
 	document_type = "Sales Order"
 	existing = _active_workflow_for(document_type)
@@ -233,32 +233,32 @@ def ensure_sales_order_workflow():
 	# ---- States ---------------------------------------------------------
 	wf.states = []
 	# Approval flow — doc_status=0 (draft, editable).
-	for st in ("ET SO Draft", "ET SO Trader Review", "ET SO Final Review", "ET SO Rejected"):
+	for st in ("Draft", "Trader Review", "Final Review", "Rejected"):
 		wf.append("states", {"state": st, "doc_status": "0", "allow_edit": edit_role})
 	# Pending Assignment — submitted (doc_status=1). Operations sees the SO here.
 	wf.append(
 		"states",
-		{"state": "ET SO Pending Assignment", "doc_status": "1", "allow_edit": final_role},
+		{"state": "Pending Assignment", "doc_status": "1", "allow_edit": final_role},
 	)
 	# In Progress — operations has assigned a handler and project is running.
 	wf.append(
 		"states",
-		{"state": "ET SO In Progress", "doc_status": "1", "allow_edit": final_role},
+		{"state": "In Progress", "doc_status": "1", "allow_edit": final_role},
 	)
 	# Raise Invoice — all project tasks done; accounts can now invoice.
 	wf.append(
 		"states",
-		{"state": "ET SO Raise Invoice", "doc_status": "1", "allow_edit": accounts_role},
+		{"state": "Raise Invoice", "doc_status": "1", "allow_edit": accounts_role},
 	)
 	# Completed — invoices paid. Read-only for most; ops can raise a claim.
 	wf.append(
 		"states",
-		{"state": "ET SO Completed", "doc_status": "1", "allow_edit": final_role},
+		{"state": "Completed", "doc_status": "1", "allow_edit": final_role},
 	)
-	# Claim — issue raised after completion. Project reopens with new tasks.
+	# Claim — issue raised after completion. Only action is Resolve (→ Completed).
 	wf.append(
 		"states",
-		{"state": "ET SO Claim", "doc_status": "1", "allow_edit": final_role},
+		{"state": "Claim", "doc_status": "1", "allow_edit": final_role},
 	)
 
 	# ---- Transitions ----------------------------------------------------
@@ -268,9 +268,9 @@ def ensure_sales_order_workflow():
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Draft",
+			"state": "Draft",
 			"action": "Send to Trader",
-			"next_state": "ET SO Trader Review",
+			"next_state": "Trader Review",
 			"allowed": edit_role,
 			"condition": "doc.custom_et_assigned_trader",
 		},
@@ -278,9 +278,9 @@ def ensure_sales_order_workflow():
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Draft",
+			"state": "Draft",
 			"action": "Send for Approval",
-			"next_state": "ET SO Final Review",
+			"next_state": "Final Review",
 			"allowed": edit_role,
 			"condition": "not doc.custom_et_assigned_trader",
 		},
@@ -288,45 +288,45 @@ def ensure_sales_order_workflow():
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Trader Review",
+			"state": "Trader Review",
 			"action": "Approve",
-			"next_state": "ET SO Final Review",
+			"next_state": "Final Review",
 			"allowed": trader_role,
 		},
 	)
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Trader Review",
+			"state": "Trader Review",
 			"action": "Reject",
-			"next_state": "ET SO Rejected",
+			"next_state": "Rejected",
 			"allowed": trader_role,
 		},
 	)
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Final Review",
+			"state": "Final Review",
 			"action": "Approve",
-			"next_state": "ET SO Pending Assignment",
+			"next_state": "Pending Assignment",
 			"allowed": final_role,
 		},
 	)
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Final Review",
+			"state": "Final Review",
 			"action": "Reject",
-			"next_state": "ET SO Rejected",
+			"next_state": "Rejected",
 			"allowed": final_role,
 		},
 	)
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Rejected",
+			"state": "Rejected",
 			"action": "Resubmit",
-			"next_state": "ET SO Draft",
+			"next_state": "Draft",
 			"allowed": edit_role,
 		},
 	)
@@ -338,9 +338,9 @@ def ensure_sales_order_workflow():
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Pending Assignment",
+			"state": "Pending Assignment",
 			"action": "Assign Team Member",
-			"next_state": "ET SO In Progress",
+			"next_state": "In Progress",
 			"allowed": final_role,
 		},
 	)
@@ -349,9 +349,9 @@ def ensure_sales_order_workflow():
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO In Progress",
+			"state": "In Progress",
 			"action": "All Tasks Done",
-			"next_state": "ET SO Raise Invoice",
+			"next_state": "Raise Invoice",
 			"allowed": final_role,
 		},
 	)
@@ -361,29 +361,32 @@ def ensure_sales_order_workflow():
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Raise Invoice",
+			"state": "Raise Invoice",
 			"action": "Mark Completed",
-			"next_state": "ET SO Completed",
+			"next_state": "Completed",
 			"allowed": accounts_role,
 		},
 	)
 
 	# --- Claim phase ---
+	# A claim raised on a completed order is resolved by simply closing it
+	# again — it returns straight to Completed. It does NOT reopen the
+	# operations/invoice cycle (no reassign, no new task spawn).
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Completed",
+			"state": "Completed",
 			"action": "Raise Claim",
-			"next_state": "ET SO Claim",
+			"next_state": "Claim",
 			"allowed": final_role,
 		},
 	)
 	wf.append(
 		"transitions",
 		{
-			"state": "ET SO Claim",
+			"state": "Claim",
 			"action": "Resolve Claim",
-			"next_state": "ET SO In Progress",
+			"next_state": "Completed",
 			"allowed": final_role,
 		},
 	)

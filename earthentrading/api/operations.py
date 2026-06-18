@@ -6,8 +6,8 @@
   grants the user view + write access to the SO via Frappe Share, creates
   the linked Project, spawns the checklist tasks, and transitions the SO
   workflow from "Pending Assignment" to "In Progress".
-- raise_claim: Completed → Claim (reopens project for new tasks).
-- resolve_claim: Claim → In Progress (resume operations).
+- raise_claim: Completed → Claim (flags a post-completion issue).
+- resolve_claim: Claim → Completed (closes the order again; no re-run of operations).
 """
 
 import json
@@ -30,9 +30,9 @@ def assign_team_member(sales_order: str, user: str, template: str | None = None)
 	so = frappe.get_doc("Sales Order", sales_order)
 	if so.docstatus != 1:
 		frappe.throw(_("Sales Order must be submitted first."))
-	if so.workflow_state not in ("ET SO Pending Assignment", "ET SO Claim"):
+	if so.workflow_state != "Pending Assignment":
 		frappe.throw(
-			_("Sales Order is in state {0}; assignment is only available in Pending Assignment or Claim.").format(
+			_("Sales Order is in state {0}; assignment is only available in Pending Assignment.").format(
 				so.workflow_state or _("unset")
 			)
 		)
@@ -75,7 +75,7 @@ def assign_team_member(sales_order: str, user: str, template: str | None = None)
 		"Sales Order",
 		sales_order,
 		"workflow_state",
-		"ET SO In Progress",
+		"In Progress",
 		update_modified=False,
 	)
 	frappe.db.commit()
@@ -90,7 +90,7 @@ def raise_claim(sales_order: str, note: str | None = None):
 	)
 	if not so:
 		frappe.throw(_("Sales Order {0} not found.").format(sales_order))
-	if so.workflow_state != "ET SO Completed":
+	if so.workflow_state != "Completed":
 		frappe.throw(
 			_("Claim can only be raised on Completed Sales Orders (current: {0}).").format(
 				so.workflow_state or _("unset")
@@ -101,30 +101,25 @@ def raise_claim(sales_order: str, note: str | None = None):
 		"Sales Order",
 		sales_order,
 		"workflow_state",
-		"ET SO Claim",
+		"Claim",
 		update_modified=False,
 	)
 
-	# Reopen the linked project so operations can add new tasks.
-	project = frappe.db.get_value("Project", {"sales_order": sales_order}, "name")
-	if project:
-		frappe.db.set_value("Project", project, "status", "Open", update_modified=False)
-		frappe.db.set_value(
-			"Project", project, "custom_et_checklist_spawned", 0, update_modified=False
-		)
-		if note:
-			try:
-				comment = frappe.new_doc("Comment")
-				comment.comment_type = "Comment"
-				comment.reference_doctype = "Project"
-				comment.reference_name = project
-				comment.content = f"Claim raised on {sales_order}: {note}"
-				comment.insert(ignore_permissions=True)
-			except Exception:
-				frappe.log_error(frappe.get_traceback(), "earthentrading.claim.comment")
+	# A claim only flags an issue; it does NOT reopen the project or respawn
+	# tasks. Record the reason as a comment on the SO for the audit trail.
+	if note:
+		try:
+			comment = frappe.new_doc("Comment")
+			comment.comment_type = "Comment"
+			comment.reference_doctype = "Sales Order"
+			comment.reference_name = sales_order
+			comment.content = f"Claim raised: {note}"
+			comment.insert(ignore_permissions=True)
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), "earthentrading.claim.comment")
 
 	frappe.db.commit()
-	return {"project": project}
+	return {"ok": True}
 
 
 @frappe.whitelist()
@@ -134,7 +129,7 @@ def resolve_claim(sales_order: str):
 	)
 	if not so:
 		frappe.throw(_("Sales Order {0} not found.").format(sales_order))
-	if so.workflow_state != "ET SO Claim":
+	if so.workflow_state != "Claim":
 		frappe.throw(
 			_("Only Sales Orders in Claim can be resolved (current: {0}).").format(
 				so.workflow_state or _("unset")
@@ -144,7 +139,7 @@ def resolve_claim(sales_order: str):
 		"Sales Order",
 		sales_order,
 		"workflow_state",
-		"ET SO In Progress",
+		"Completed",
 		update_modified=False,
 	)
 	frappe.db.commit()

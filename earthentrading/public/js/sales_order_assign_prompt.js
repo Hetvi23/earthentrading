@@ -29,7 +29,14 @@
 			// (3) State-driven action buttons on submitted SOs.
 			if (frm.doc.docstatus === 1) {
 				addLifecycleButtons(frm);
-				hideStandardInvoiceButtonIfBlocked(frm);
+				// Offer "Create > Project" on every submitted SO.
+				frm.add_custom_button(
+					__("Project"),
+					() => openCreateProjectDialog(frm),
+					__("Create")
+				);
+				// Strip the Create menu down to just Sales Invoice + Project.
+				restrictCreateMenu(frm);
 			}
 
 			// (1) Workflow approval submits server-side via apply_workflow and
@@ -52,15 +59,15 @@
 	function addLifecycleButtons(frm) {
 		const ws = frm.doc.workflow_state;
 
-		if (ws === "ET SO Pending Assignment" || ws === "ET SO Claim") {
+		if (ws === "Pending Assignment") {
 			frm.add_custom_button(
-				ws === "ET SO Claim" ? __("Reassign / Add Tasks") : __("Assign Team Member"),
+				__("Assign Team Member"),
 				() => openAssignTeamMemberDialog(frm),
 				__("Operations")
 			);
 		}
 
-		if (ws === "ET SO Completed") {
+		if (ws === "Completed") {
 			frm.add_custom_button(
 				__("Raise Claim"),
 				() => openRaiseClaimDialog(frm),
@@ -68,11 +75,13 @@
 			);
 		}
 
-		if (ws === "ET SO Claim") {
+		// Once a claim is raised the only action is to close it again — resolving
+		// returns the order straight to Completed (no reassign / re-run).
+		if (ws === "Claim") {
 			frm.add_custom_button(
 				__("Resolve Claim"),
 				() => {
-					frappe.confirm(__("Mark claim resolved and resume operations?"), () => {
+					frappe.confirm(__("Mark claim resolved and close this order again?"), () => {
 						frappe
 							.call({
 								method: "earthentrading.api.operations.resolve_claim",
@@ -89,23 +98,32 @@
 		}
 	}
 
-	function hideStandardInvoiceButtonIfBlocked(frm) {
-		// The standard ERPNext "Create > Sales Invoice" menu item is only
-		// allowed when the SO is in Raise Invoice state. Hide it otherwise.
-		if (frm.doc.workflow_state === "ET SO Raise Invoice") return;
+	function restrictCreateMenu(frm) {
+		// The standard ERPNext "Create" dropdown carries many actions
+		// (Delivery Note, Payment, Material Request, Pick List, …). Keep only:
+		//   • Project   — always (our action, added above)
+		//   • Sales Invoice — only while the SO is in "Raise Invoice" state
+		// Everything else is hidden. Done in the DOM because ERPNext adds its
+		// own Create buttons during its refresh handler.
+		const allowInvoice = frm.doc.workflow_state === "Raise Invoice";
 		setTimeout(() => {
-			frm.page.menu
-				.find("a.dropdown-item")
-				.filter((_, el) => /^\s*Sales Invoice\s*$/i.test($(el).text()))
-				.parent()
-				.hide();
-			// Same for the inner "Create" dropdown that ERPNext sometimes uses.
-			$("button.btn-default")
-				.parent()
-				.find("a.grey-link, a.dropdown-item")
-				.filter((_, el) => /Sales Invoice/i.test($(el).text()))
-				.hide();
-		}, 200);
+			const $scope =
+				frm.page && frm.page.inner_toolbar && frm.page.inner_toolbar.length
+					? frm.page.inner_toolbar
+					: $(".page-actions");
+			$scope.find(".btn-group").each(function () {
+				const $grp = $(this);
+				const label = ($grp.find(".dropdown-toggle").first().text() || "").trim();
+				if (label !== __("Create")) return;
+				$grp.find("a.dropdown-item, a.grey-link").each(function () {
+					const txt = ($(this).text() || "").trim();
+					let keep = false;
+					if (txt === __("Project")) keep = true;
+					else if (txt === __("Sales Invoice")) keep = allowInvoice;
+					$(this).toggle(keep);
+				});
+			});
+		}, 300);
 	}
 
 	function openAssignTeamMemberDialog(frm) {

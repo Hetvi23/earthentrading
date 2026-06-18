@@ -30,7 +30,7 @@ def before_submit(doc, method):
 	if not is_earth_trading_quotation_workflow_active():
 		return
 	ws = doc.get("workflow_state")
-	if ws != "ET Quote Approved":
+	if ws != "Quote Approved":
 		frappe.throw(
 			_("Quotation can only be submitted after workflow approval (current: {0}).").format(ws or _("unset"))
 		)

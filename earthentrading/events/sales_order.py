@@ -14,17 +14,17 @@ from earthentrading.utils import (
 # first time, but a doc could land in In Progress / Raise Invoice / etc.
 # from later transitions).
 POST_APPROVAL_STATES = {
-	"ET SO Pending Assignment",
-	"ET SO In Progress",
-	"ET SO Raise Invoice",
-	"ET SO Completed",
-	"ET SO Claim",
+	"Pending Assignment",
+	"In Progress",
+	"Raise Invoice",
+	"Completed",
+	"Claim",
 }
 
 
 def validate(doc, method):
 	_sync_assigned_trader_from_items(doc)
-	_send_email_on_final_approval(doc)
+	_send_email_on_trader_approval(doc)
 
 
 def before_submit(doc, method):
@@ -41,11 +41,14 @@ def before_submit(doc, method):
 		_validate_linked_quotations_approved(doc)
 
 
-def _send_email_on_final_approval(doc):
-	"""Send the trade confirmation email to buyer + seller when the SO
-	transitions from Final Review to Pending Assignment (trade manager
-	just approved). Picks the single-commodity or multi-commodity template
-	based on the number of items on the SO."""
+def _send_email_on_trader_approval(doc):
+	"""Send the trade confirmation email to buyer + seller when the trade
+	manager approves the deal — i.e. the SO enters Final Review. This happens
+	on Trader Review -> Final Review (trade manager approving an
+	assigned-trader deal) and, when no trader was assigned, on the
+	Draft -> Final Review send-for-approval path. It fires BEFORE the
+	operations manager's final approval. Picks the single- or multi-commodity
+	template based on the number of items on the SO."""
 	if not is_earth_trading_sales_order_workflow_active():
 		return
 	if doc.is_new():
@@ -55,7 +58,7 @@ def _send_email_on_final_approval(doc):
 		return
 	prev_state = previous.get("workflow_state")
 	new_state = doc.get("workflow_state")
-	if prev_state == "ET SO Final Review" and new_state == "ET SO Pending Assignment":
+	if new_state == "Final Review" and prev_state in ("Trader Review", "Draft"):
 		_send_approval_email(doc)
 
 
@@ -366,7 +369,7 @@ def _validate_linked_quotations_approved(doc):
 		if not is_earth_trading_quotation_workflow_active():
 			continue
 		ws = frappe.db.get_value("Quotation", qname, "workflow_state")
-		if ws != "ET Quote Approved":
+		if ws != "Quote Approved":
 			frappe.throw(
 				_("Linked Quotation {0} must be workflow-approved before Sales Order submit (state: {1}).").format(
 					qname, ws or _("unset")

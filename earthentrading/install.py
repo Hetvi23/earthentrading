@@ -22,6 +22,7 @@ from earthentrading.setup.task_templates import ensure_task_templates
 from earthentrading.setup.migrate_trading_lines import run_all as migrate_trading_lines_data
 from earthentrading.setup.web_form import ensure_lead_web_form, sync_earth_trading_lead_web_form
 from earthentrading.setup.workflow import ensure_workflows
+from earthentrading.setup.migrate_workflow_state_names import rename_legacy_workflow_states
 
 
 def before_install():
@@ -65,6 +66,10 @@ def _install_all():
 		ensure_workflows()
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_workflows")
+	try:
+		rename_legacy_workflow_states()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.rename_legacy_workflow_states")
 	try:
 		ensure_lead_web_form()
 	except Exception:

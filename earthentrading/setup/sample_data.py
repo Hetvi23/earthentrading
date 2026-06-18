@@ -457,11 +457,12 @@ def _ensure_sales_orders():
 		doc.flags.ignore_permissions = True
 		doc.flags.ignore_mandatory = True
 		doc.insert(ignore_permissions=True)
-		# After insert, set workflow_state to Approved directly in DB so the
-		# before_submit gate in events/sales_order.py passes; the workflow
-		# itself is also disabled during seeding (see _disabled_workflows).
+		# After insert, drop the SO into a real post-approval state (Pending
+		# Assignment) directly in DB so the before_submit gate in
+		# events/sales_order.py passes; the workflow itself is also disabled
+		# during seeding (see _disabled_workflows).
 		frappe.db.set_value(
-			"Sales Order", doc.name, "workflow_state", "ET SO Approved", update_modified=False
+			"Sales Order", doc.name, "workflow_state", "Pending Assignment", update_modified=False
 		)
 		doc.reload()
 		doc.submit()

@@ -152,11 +152,15 @@
 			return;
 		}
 		const stateColor = {
-			"ET SO Draft": "gray",
-			"ET SO Trader Review": "orange",
-			"ET SO Final Review": "blue",
-			"ET SO Approved": "green",
-			"ET SO Rejected": "red",
+			"Draft": "gray",
+			"Trader Review": "orange",
+			"Final Review": "blue",
+			"Pending Assignment": "purple",
+			"In Progress": "blue",
+			"Raise Invoice": "orange",
+			"Completed": "green",
+			"Claim": "red",
+			"Rejected": "red",
 		};
 		rows.forEach((r) => {
 			const wsLabel = r.workflow_state || "—";

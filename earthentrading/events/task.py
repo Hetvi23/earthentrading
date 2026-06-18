@@ -33,9 +33,9 @@ def on_update(doc, method):
 
 	so_name = project["sales_order"]
 	ws = frappe.db.get_value("Sales Order", so_name, "workflow_state")
-	if ws not in ("ET SO In Progress", "ET SO Claim"):
-		# Only transition from these two states. Defensive — if SO is already
-		# in Raise Invoice / Completed / etc., don't bounce it backwards.
+	if ws != "In Progress":
+		# Only transition from In Progress. Defensive — if SO is already in
+		# Raise Invoice / Completed / Claim / etc., don't bounce it backwards.
 		return
 
 	# Check remaining open tasks on the project.
@@ -52,7 +52,7 @@ def on_update(doc, method):
 			"Sales Order",
 			so_name,
 			"workflow_state",
-			"ET SO Raise Invoice",
+			"Raise Invoice",
 			update_modified=False,
 		)
 		# Also close the project so it's clearly finished.

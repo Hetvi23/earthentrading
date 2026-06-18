@@ -3,7 +3,7 @@
 
 """Override erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice
 to enforce: a Sales Invoice can only be created when the SO is in
-"ET SO Raise Invoice" workflow state. Operations must mark all project
+"Raise Invoice" workflow state. Operations must mark all project
 tasks done first; accounts users only see Create > Sales Invoice then."""
 
 import frappe
@@ -20,7 +20,7 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False, a
 
 	if is_earth_trading_sales_order_workflow_active():
 		ws = frappe.db.get_value("Sales Order", source_name, "workflow_state")
-		if ws != "ET SO Raise Invoice":
+		if ws != "Raise Invoice":
 			frappe.throw(
 				_(
 					"Sales Invoice can only be created when the Sales Order is in "

@@ -42,7 +42,7 @@ def _maybe_complete_linked_sales_orders(si_doc):
 
 def _maybe_complete_sales_order(sales_order_name: str):
 	ws = frappe.db.get_value("Sales Order", sales_order_name, "workflow_state")
-	if ws != "ET SO Raise Invoice":
+	if ws != "Raise Invoice":
 		# Only transition from Raise Invoice. If SO is still In Progress or
 		# already Completed, do nothing.
 		return
@@ -70,7 +70,7 @@ def _maybe_complete_sales_order(sales_order_name: str):
 			"Sales Order",
 			sales_order_name,
 			"workflow_state",
-			"ET SO Completed",
+			"Completed",
 			update_modified=False,
 		)
 		frappe.db.commit()

@@ -154,6 +154,7 @@
 		const stateColor = {
 			"Draft": "gray",
 			"Trader Review": "orange",
+			"Trader Manager Review": "orange",
 			"Final Review": "blue",
 			"Pending Assignment": "purple",
 			"In Progress": "blue",

@@ -58,7 +58,7 @@ def _send_email_on_trader_approval(doc):
 		return
 	prev_state = previous.get("workflow_state")
 	new_state = doc.get("workflow_state")
-	if new_state == "Final Review" and prev_state in ("Trader Review", "Draft"):
+	if new_state == "Final Review" and prev_state in ("Trader Manager Review", "Draft"):
 		_send_approval_email(doc)
 
 

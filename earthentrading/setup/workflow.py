@@ -60,6 +60,7 @@ def ensure_workflow_prerequisites():
 		# Sales Order — extended lifecycle.
 		("Draft", "Warning"),
 		("Trader Review", "Primary"),
+		("Trader Manager Review", "Primary"),
 		("Final Review", "Primary"),
 		("Pending Assignment", "Inverse"),
 		("In Progress", "Primary"),
@@ -214,11 +215,15 @@ def ensure_sales_order_workflow():
 			return
 
 	edit_role = "Sales User" if frappe.db.exists("Role", "Sales User") else "System Manager"
-	# Trader Review is approved by the Trader Manager (a tier above the deal's
-	# trader), not the ET Trader who owns the deal.
+	# Two-step trader approval: the deal's own trader (Assigned Trader / Co-Trader)
+	# approves first (Trader Review), then the Trader Manager (Trader Manager
+	# Review, where the buyer/seller email fires).
+	trader_role = "ET Trader" if frappe.db.exists("Role", "ET Trader") else "Sales Manager"
 	trader_mgr_role = "ET Trader Manager" if frappe.db.exists("Role", "ET Trader Manager") else "Sales Manager"
 	final_role = "ET Operations" if frappe.db.exists("Role", "ET Operations") else "Sales Manager"
 	accounts_role = "Accounts User" if frappe.db.exists("Role", "Accounts User") else "System Manager"
+	# Restrict the first approval to the specific traders named on the SO.
+	trader_match = "frappe.session.user in (doc.custom_et_assigned_trader, doc.custom_et_co_trader)"
 
 	name = "Earth Trading Sales Order"
 	if frappe.db.exists("Workflow", name):
@@ -235,7 +240,7 @@ def ensure_sales_order_workflow():
 	# ---- States ---------------------------------------------------------
 	wf.states = []
 	# Approval flow — doc_status=0 (draft, editable).
-	for st in ("Draft", "Trader Review", "Final Review", "Rejected"):
+	for st in ("Draft", "Trader Review", "Trader Manager Review", "Final Review", "Rejected"):
 		wf.append("states", {"state": st, "doc_status": "0", "allow_edit": edit_role})
 	# Pending Assignment — submitted (doc_status=1). Operations sees the SO here.
 	wf.append(
@@ -287,10 +292,33 @@ def ensure_sales_order_workflow():
 			"condition": "not doc.custom_et_assigned_trader",
 		},
 	)
+	# Step 1: the deal's own trader (Assigned Trader / Co-Trader) approves.
 	wf.append(
 		"transitions",
 		{
 			"state": "Trader Review",
+			"action": "Approve",
+			"next_state": "Trader Manager Review",
+			"allowed": trader_role,
+			"condition": trader_match,
+		},
+	)
+	wf.append(
+		"transitions",
+		{
+			"state": "Trader Review",
+			"action": "Reject",
+			"next_state": "Rejected",
+			"allowed": trader_role,
+			"condition": trader_match,
+		},
+	)
+	# Step 2: the Trader Manager approves (this is where the buyer/seller
+	# trade-confirmation email fires, on entering Final Review).
+	wf.append(
+		"transitions",
+		{
+			"state": "Trader Manager Review",
 			"action": "Approve",
 			"next_state": "Final Review",
 			"allowed": trader_mgr_role,
@@ -299,7 +327,7 @@ def ensure_sales_order_workflow():
 	wf.append(
 		"transitions",
 		{
-			"state": "Trader Review",
+			"state": "Trader Manager Review",
 			"action": "Reject",
 			"next_state": "Rejected",
 			"allowed": trader_mgr_role,

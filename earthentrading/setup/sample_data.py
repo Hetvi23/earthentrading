@@ -346,11 +346,21 @@ def _ensure_leads():
 		)
 		for tr in trade_rows:
 			tx, commodity, origin, dest, role = tr
+			# trade_rows reference the commodity by display name; the field links
+			# to Item (named by item_code), so resolve name -> code.
+			item = (
+				frappe.db.get_value("Item", {"item_name": commodity}, "name")
+				or (commodity if frappe.db.exists("Item", commodity) else None)
+			)
+			# commodity is a mandatory Link to Item; skip rows whose commodity
+			# isn't one of the seeded items rather than failing the whole Lead.
+			if not item:
+				continue
 			doc.append(
 				"custom_et_trade_report",
 				{
 					"transaction_id": tx,
-					"commodity": commodity,
+					"commodity": item,
 					"origin": _country_or_none(origin),
 					"destination": _country_or_none(dest),
 					"role": role,
@@ -415,9 +425,11 @@ def _ensure_sales_orders():
 				"transaction_date": txn_date,
 				"delivery_date": delivery_date,
 				"company": company,
-				"order_type": "Sales",
-				"po_no": f"PO-{title}",
-				"po_date": txn_date,
+				# order_type options are restricted to Sales Contract / Trade
+				# Contract by the app; these demo orders are the source contracts.
+				# (po_no is repurposed as a Link to a Trade Contract SO, so it's
+				# left unset here.)
+				"order_type": "Trade Contract",
 				"currency": "USD",
 				"conversion_rate": 83.0,
 				"selling_price_list": frappe.db.get_value("Price List", {"selling": 1}, "name") or "Standard Selling",

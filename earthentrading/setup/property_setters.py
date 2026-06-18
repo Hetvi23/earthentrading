@@ -51,6 +51,10 @@ PROPERTY_SETTERS = [
 	("Sales Order", "total_qty", "in_list_view", "1", "Check"),
 	# Order Type is restricted to Sales Contract / Trade Contract.
 	("Sales Order", "order_type", "options", "Sales Contract\nTrade Contract", "Text"),
+	# The standard field default is "Sales", which is no longer a valid option;
+	# point it at a valid one so meta validation (e.g. country-fixture install)
+	# doesn't choke on an out-of-list default.
+	("Sales Order", "order_type", "default", "Sales Contract", "Text"),
 	# Delivery Date is no longer mandatory (trade contracts often have no
 	# defined delivery date until shipping is confirmed).
 	("Sales Order", "delivery_date", "reqd", "0", "Check"),

@@ -1,0 +1,74 @@
+{
+ "actions": [],
+ "creation": "2026-06-21 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "party_side",
+  "source",
+  "recipient_name",
+  "email",
+  "is_primary",
+  "is_cc"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "party_side",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Side",
+   "options": "Customer\nSupplier"
+  },
+  {
+   "columns": 2,
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Source",
+   "options": "Primary Email\nAdditional Email\nConnected User"
+  },
+  {
+   "columns": 2,
+   "fieldname": "recipient_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Name"
+  },
+  {
+   "columns": 2,
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "is_primary",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Primary (To)"
+  },
+  {
+   "columns": 1,
+   "fieldname": "is_cc",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "CC"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-21 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Earth Ent Trading",
+ "name": "ET Email Recipient",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

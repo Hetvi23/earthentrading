@@ -151,6 +151,37 @@ CUSTOM_FIELDS = {
 			"description": "Associated / parent buyer in a group structure",
 			"insert_after": "custom_et_party_section",
 		},
+		{
+			"fieldname": "custom_et_emails_section",
+			"fieldtype": "Section Break",
+			"label": "Trade emails & team",
+			"insert_after": "custom_et_parent_customer",
+			"collapsible": 1,
+		},
+		{
+			"fieldname": "custom_et_emails_quick",
+			"fieldtype": "Small Text",
+			"label": "Add Emails (one per line)",
+			"description": "Quick-add: one email per line. On save they are added to the Emails table below — the first becomes the primary / 'To' if none is set yet.",
+			"insert_after": "custom_et_emails_section",
+			"allow_in_quick_entry": 1,
+		},
+		{
+			"fieldname": "custom_et_emails",
+			"fieldtype": "Table",
+			"label": "Emails",
+			"options": "ET Party Email",
+			"description": "Trade emails for this customer. Tick Primary for the 'To' address(es); the rest are CC'd.",
+			"insert_after": "custom_et_emails_quick",
+		},
+		{
+			"fieldname": "custom_et_dealing_users",
+			"fieldtype": "Table",
+			"label": "Dealing Users",
+			"options": "ET Party User",
+			"description": "Internal users who deal with this customer (CC'd on trade emails).",
+			"insert_after": "custom_et_emails",
+		},
 	],
 	"Supplier": [
 		{
@@ -167,6 +198,37 @@ CUSTOM_FIELDS = {
 			"label": "Parent company",
 			"description": "Associated / parent supplier in a group structure",
 			"insert_after": "custom_et_party_section",
+		},
+		{
+			"fieldname": "custom_et_emails_section",
+			"fieldtype": "Section Break",
+			"label": "Trade emails & team",
+			"insert_after": "custom_et_parent_supplier",
+			"collapsible": 1,
+		},
+		{
+			"fieldname": "custom_et_emails_quick",
+			"fieldtype": "Small Text",
+			"label": "Add Emails (one per line)",
+			"description": "Quick-add: one email per line. On save they are added to the Emails table below — the first becomes the primary / 'To' if none is set yet.",
+			"insert_after": "custom_et_emails_section",
+			"allow_in_quick_entry": 1,
+		},
+		{
+			"fieldname": "custom_et_emails",
+			"fieldtype": "Table",
+			"label": "Emails",
+			"options": "ET Party Email",
+			"description": "Trade emails for this supplier. Tick Primary for the 'To' address(es); the rest are CC'd.",
+			"insert_after": "custom_et_emails_quick",
+		},
+		{
+			"fieldname": "custom_et_dealing_users",
+			"fieldtype": "Table",
+			"label": "Dealing Users",
+			"options": "ET Party User",
+			"description": "Internal users who deal with this supplier (CC'd on trade emails).",
+			"insert_after": "custom_et_emails",
 		},
 	],
 	"Quotation": [
@@ -234,14 +296,16 @@ CUSTOM_FIELDS = {
 		# --- Top section additions to match the operations layout ----------
 		# Standard SO already has 3 columns in the Customer section
 		# (column_break_7 between order_type and transaction_date, and
-		# column_break1 between delivery_date and po_no). Just slot Buyer
+		# column_break1 between delivery_date and po_no). Just slot Supplier
 		# under order_type (col 1) and Contract Type under po_date (col 3).
+		# Trading roles: the standard `customer` field is the BUYER, and this
+		# Supplier field is the SELLER.
 		{
-			"fieldname": "custom_et_buyer",
+			"fieldname": "custom_et_supplier",
 			"fieldtype": "Link",
-			"options": "Customer",
-			"label": "Buyer",
-			"description": "End-buyer of the trade (use when Customer is a broker / intermediary).",
+			"options": "Supplier",
+			"label": "Supplier",
+			"description": "Seller / supplier of the trade (the Customer is the buyer).",
 			"insert_after": "order_type",
 			"reqd": 1,
 			"in_list_view": 1,
@@ -267,8 +331,9 @@ CUSTOM_FIELDS = {
 			"fieldname": "custom_et_brokerage_commission_value",
 			"fieldtype": "Float",
 			"label": "Brokerage Commission Value",
+			"description": "Per-unit brokerage commission. Shown in the Seller email only.",
 			"insert_after": "custom_et_operations_section",
-			"reqd": 1,
+			"reqd": 0,
 		},
 		{
 			"fieldname": "custom_et_co_brokerage_commission_value",
@@ -276,7 +341,8 @@ CUSTOM_FIELDS = {
 			"label": "Co-Brokerage Commission Value",
 			"default": "0",
 			"insert_after": "custom_et_brokerage_commission_value",
-			"reqd": 1,
+			"reqd": 0,
+			"hidden": 1,
 		},
 		{
 			"fieldname": "custom_et_insurance_value",
@@ -284,7 +350,8 @@ CUSTOM_FIELDS = {
 			"label": "Insurance Value",
 			"default": "0",
 			"insert_after": "custom_et_co_brokerage_commission_value",
-			"reqd": 1,
+			"reqd": 0,
+			"hidden": 1,
 		},
 		{
 			"fieldname": "custom_et_brokerage_commission_unit",
@@ -292,12 +359,14 @@ CUSTOM_FIELDS = {
 			"options": "UOM",
 			"label": "Brokerage Commission Unit",
 			"insert_after": "custom_et_insurance_value",
-			"reqd": 1,
+			"reqd": 0,
 		},
 		{
 			"fieldname": "custom_et_trade_payment",
-			"fieldtype": "Small Text",
+			"fieldtype": "Link",
+			"options": "Payment Terms Template",
 			"label": "Trade Payment",
+			"description": "Payment terms shown in the trade email.",
 			"insert_after": "custom_et_brokerage_commission_unit",
 			"reqd": 1,
 		},
@@ -354,13 +423,45 @@ CUSTOM_FIELDS = {
 			"insert_after": "custom_et_destination",
 			"reqd": 1,
 		},
+		# --- Email recipients ------------------------------------------------
+		# Auto-filled from the selected Customer + Supplier (see
+		# earthentrading.api.recipients). Each row is tagged Customer/Supplier
+		# and carries editable Primary (To) / CC ticks; the trade-confirmation
+		# email's To/CC is built from this table.
+		{
+			"fieldname": "custom_et_email_section",
+			"fieldtype": "Section Break",
+			"label": "Email Recipients",
+			"insert_after": "custom_et_port_of_destination",
+			"collapsible": 1,
+			"description": (
+				"Auto-filled from the Customer and Supplier when selected: primary email (To), "
+				"secondary email and connected users (CC). Tick Primary / CC per row; "
+				"a row with neither ticked is not emailed."
+			),
+		},
+		{
+			"fieldname": "custom_et_email_recipients",
+			"fieldtype": "Table",
+			"label": "Recipients",
+			"options": "ET Email Recipient",
+			"insert_after": "custom_et_email_section",
+		},
 	],
 	"Sales Order Item": [
+		{
+			"fieldname": "custom_et_container",
+			"fieldtype": "Data",
+			"label": "Container",
+			"description": "e.g. 2x20FCL — shown next to quantity in the trade email.",
+			"insert_after": "item_name",
+			"in_list_view": 0,
+		},
 		{
 			"fieldname": "custom_et_packaging",
 			"fieldtype": "Data",
 			"label": "Packaging",
-			"insert_after": "item_name",
+			"insert_after": "custom_et_container",
 			"in_list_view": 0,
 		},
 		{
@@ -414,6 +515,15 @@ CUSTOM_FIELDS = {
 			"default": "0",
 			"insert_after": "custom_et_task_template",
 			"description": "Set automatically after tasks are created from the template (runs once per project).",
+		},
+	],
+	"User": [
+		{
+			"fieldname": "custom_et_commission_pct",
+			"fieldtype": "Percent",
+			"label": "Commission %",
+			"description": "Earth Trading: this trader's share of the gross brokerage commission on deals where they are the trader / co-trader.",
+			"insert_after": "user_type",
 		},
 	],
 }

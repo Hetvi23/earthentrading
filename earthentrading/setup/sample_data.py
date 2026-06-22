@@ -393,6 +393,11 @@ def _restore_workflows(names):
 
 
 def _ensure_sales_orders():
+	from earthentrading.setup.payment_terms import ensure_payment_terms_templates
+
+	# Trade Payment is a Link → Payment Terms Template; make sure the demo
+	# template exists before seeding SOs that reference it.
+	ensure_payment_terms_templates()
 	company = _company()
 	uom = "Metric Ton"
 	# Wipe any half-inserted drafts from a previous failed run so the loop is
@@ -416,6 +421,9 @@ def _ensure_sales_orders():
 		contract = random.choice(CONTRACT_TYPES)
 		packaging = random.choice(PACKAGING_DESIGNS)
 		delivery_date = frappe.utils.add_months(txn_date, 2)
+		# New model: custom_et_supplier is the seller (the legacy `buyer` tuple
+		# element was a Customer and no longer maps). Cycle the demo suppliers.
+		supplier = SUPPLIERS[idx % len(SUPPLIERS)][0]
 
 		doc = frappe.get_doc(
 			{
@@ -436,12 +444,12 @@ def _ensure_sales_orders():
 				"price_list_currency": "USD",
 				"plc_conversion_rate": 83.0,
 				"custom_et_contract_type": contract,
-				"custom_et_buyer": buyer,
+				"custom_et_supplier": supplier,
 				"custom_et_brokerage_commission_value": 20,
 				"custom_et_co_brokerage_commission_value": 0,
 				"custom_et_insurance_value": 0,
 				"custom_et_brokerage_commission_unit": uom,
-				"custom_et_trade_payment": "20% Advance 80% by wire transfer on presentation of documents to Buyer's Bank",
+				"custom_et_trade_payment": "100% against scanned documents",
 				"custom_et_port_of_loading": port_loading,
 				"custom_et_origin": _country_or_none(origin),
 				"custom_et_packaging_design": packaging,
@@ -458,6 +466,7 @@ def _ensure_sales_orders():
 						"conversion_factor": 1,
 						"rate": rate,
 						"delivery_date": delivery_date,
+						"custom_et_container": "2x20FCL",
 						"custom_et_packaging": "7KG PP Bags",
 						"custom_et_shipping_start": txn_date,
 						"custom_et_shipping_end": frappe.utils.add_days(txn_date, 26),

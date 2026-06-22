@@ -8,3 +8,11 @@
 earthentrading.patches.migrate_port_fields_to_link
 earthentrading.patches.remove_lead_commodities_section
 earthentrading.patches.rebuild_earth_workspace_editor_content
+# Replaces Sales Order custom_et_buyer (Customer) with custom_et_supplier (seller).
+earthentrading.patches.remove_legacy_buyer_field
+# Replaces Customer/Supplier primary+secondary email Data fields with the
+# custom_et_emails table (multiple addresses per party).
+earthentrading.patches.drop_party_email_data_fields
+# Trade Payment Small Text -> Link (Payment Terms Template); drop old field so
+# create_custom_fields re-adds it as a Link.
+earthentrading.patches.convert_trade_payment_to_link

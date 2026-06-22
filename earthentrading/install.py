@@ -9,6 +9,7 @@ from earthentrading.setup.dashboard import ensure_earth_trading_dashboard
 from earthentrading.setup.lead_functions import ensure_lead_functions
 from earthentrading.setup.lead_layout import apply_lead_layout
 from earthentrading.setup.ports import ensure_ports
+from earthentrading.setup.payment_terms import ensure_payment_terms_templates
 from earthentrading.setup.property_setters import ensure_property_setters
 from earthentrading.setup.roles import ensure_role_permissions, ensure_roles
 from earthentrading.setup.crm_workspace import (
@@ -56,6 +57,10 @@ def _install_all():
 		ensure_ports()
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_ports")
+	try:
+		ensure_payment_terms_templates()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_payment_terms_templates")
 	try:
 		migrate_trading_lines_data()
 	except Exception:

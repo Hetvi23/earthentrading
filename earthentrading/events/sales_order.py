@@ -4,6 +4,7 @@
 import frappe
 from frappe import _
 
+from earthentrading.api.recipients import build_recipient_candidates
 from earthentrading.utils import (
 	is_earth_trading_quotation_workflow_active,
 	is_earth_trading_sales_order_workflow_active,
@@ -24,7 +25,59 @@ POST_APPROVAL_STATES = {
 
 def validate(doc, method):
 	_sync_assigned_trader_from_items(doc)
+	_reconcile_email_recipients(doc)
 	_send_email_on_trader_approval(doc)
+
+
+def _reconcile_email_recipients(doc):
+	"""Keep custom_et_email_recipients in sync with the selected Customer
+	(buyer) and Supplier (seller).
+
+	- Add any missing rows from each party's primary / secondary email and
+	  dealing users (defaults: primary -> To, secondary + users -> CC).
+	- Preserve the Primary / CC ticks (and any manually added rows) the user
+	  has already edited, matching on (party_side, email).
+	- Drop a side's rows when its party link changes, so stale recipients from
+	  a previously-selected Customer/Supplier don't linger.
+	"""
+	candidates = build_recipient_candidates(doc.get("customer"), doc.get("custom_et_supplier"))
+
+	# Only drop a side's rows when a previously-saved party link actually
+	# changed. On a brand-new doc (no prior state) we keep whatever rows are
+	# already present — e.g. the client-filled rows the user may have edited
+	# before the first save — and only top up missing candidates.
+	prev = doc.get_doc_before_save()
+	customer_changed = bool(prev) and prev.get("customer") != doc.get("customer")
+	supplier_changed = bool(prev) and prev.get("custom_et_supplier") != doc.get("custom_et_supplier")
+
+	kept_rows = []
+	preserved_keys: set[tuple] = set()
+	for row in doc.get("custom_et_email_recipients") or []:
+		side = row.get("party_side")
+		if (side == "Customer" and customer_changed) or (side == "Supplier" and supplier_changed):
+			continue
+		kept_rows.append(
+			{
+				"party_side": side,
+				"source": row.get("source"),
+				"recipient_name": row.get("recipient_name"),
+				"email": row.get("email"),
+				"is_primary": row.get("is_primary"),
+				"is_cc": row.get("is_cc"),
+			}
+		)
+		preserved_keys.add((side, (row.get("email") or "").strip().lower()))
+
+	# Rebuild: kept rows first (order + ticks preserved), then missing candidates.
+	doc.set("custom_et_email_recipients", [])
+	for row in kept_rows:
+		doc.append("custom_et_email_recipients", row)
+	for cand in candidates:
+		key = (cand["party_side"], (cand["email"] or "").strip().lower())
+		if key in preserved_keys:
+			continue
+		doc.append("custom_et_email_recipients", cand)
+		preserved_keys.add(key)
 
 
 def before_submit(doc, method):
@@ -63,16 +116,25 @@ def _send_email_on_trader_approval(doc):
 
 
 def _send_approval_email(doc):
-	recipients = _collect_recipients(doc)
-	if not recipients:
+	# Two side-specific emails: the Buyer (Customer side) gets no commission
+	# line; the Seller (Supplier side) does.
+	_send_side_email(doc, side="buyer", party_side="Customer")
+	_send_side_email(doc, side="seller", party_side="Supplier")
+
+
+def _send_side_email(doc, side: str, party_side: str):
+	to, cc = _collect_to_cc(doc, party_side)
+	if not to and not cc:
 		return
-	body = _render_confirmation_email(doc)
+	body = _render_confirmation_email(doc, side)
 	subject = _("Trade Confirmation — {0} ({1})").format(
-		doc.name, _resolve_customer_label(doc, "buyer")
+		doc.name, _resolve_customer_label(doc, side)
 	)
 	try:
 		frappe.sendmail(
-			recipients=recipients,
+			# If no row is ticked Primary, fall back to sending to the CC list.
+			recipients=to or cc,
+			cc=cc if to else None,
 			subject=subject,
 			message=body,
 			reference_doctype="Sales Order",
@@ -85,100 +147,81 @@ def _send_approval_email(doc):
 		)
 
 
-def _collect_recipients(doc) -> list[str]:
-	"""Buyer (custom_et_buyer) + Seller (customer) primary contact emails
-	+ contact_email on the SO itself. De-duped, empty values stripped."""
-	emails: list[str] = []
-	for customer_field in ("custom_et_buyer", "customer"):
-		cust = doc.get(customer_field)
-		if not cust:
+def _collect_to_cc(doc, side: str | None = None) -> tuple[list[str], list[str]]:
+	"""Build (To, CC) from custom_et_email_recipients: rows ticked Primary go
+	to To, rows ticked CC go to CC. A row with neither tick is skipped, and an
+	address that is both Primary and CC stays only in To. De-duped, order
+	preserved. When `side` ("Customer"/"Supplier") is given, only that side's
+	rows are considered."""
+	to: list[str] = []
+	cc: list[str] = []
+	to_seen: set[str] = set()
+	cc_seen: set[str] = set()
+	for row in doc.get("custom_et_email_recipients") or []:
+		if side and row.get("party_side") != side:
 			continue
-		em = _primary_email_for_customer(cust)
-		if em:
-			emails.append(em)
-	if doc.get("contact_email"):
-		emails.append(doc.contact_email)
-	# De-dupe preserving order
-	seen: set[str] = set()
-	out: list[str] = []
-	for e in emails:
-		e = (e or "").strip()
-		if not e or e in seen:
+		email = (row.get("email") or "").strip()
+		if not email:
 			continue
-		seen.add(e)
-		out.append(e)
-	return out
-
-
-def _primary_email_for_customer(customer: str) -> str | None:
-	"""Best-effort lookup of a customer's primary contact email via
-	Dynamic Link → Contact → email_ids."""
-	contact = frappe.db.sql(
-		"""
-		SELECT c.name
-		FROM `tabContact` c
-		JOIN `tabDynamic Link` dl ON dl.parent = c.name AND dl.parenttype = 'Contact'
-		WHERE dl.link_doctype = 'Customer'
-		  AND dl.link_name = %s
-		ORDER BY c.is_primary_contact DESC, c.modified DESC
-		LIMIT 1
-		""",
-		customer,
-		as_dict=True,
-	)
-	if not contact:
-		return None
-	row = frappe.db.get_value(
-		"Contact Email",
-		{"parent": contact[0].name, "is_primary": 1},
-		"email_id",
-	) or frappe.db.get_value(
-		"Contact Email", {"parent": contact[0].name}, "email_id"
-	)
-	return row
+		key = email.lower()
+		if row.get("is_primary"):
+			if key not in to_seen:
+				to_seen.add(key)
+				to.append(email)
+		elif row.get("is_cc"):
+			if key not in cc_seen:
+				cc_seen.add(key)
+				cc.append(email)
+	cc = [e for e in cc if e.lower() not in to_seen]
+	return to, cc
 
 
 def _resolve_customer_label(doc, kind: str) -> str:
-	"""Return the human-readable Customer Name for the seller or buyer
+	"""Human-readable name for the buyer (= Customer) or seller (= Supplier)
 	side of the SO."""
-	if kind == "buyer":
-		return (
-			(doc.get("custom_et_buyer") and frappe.db.get_value(
-				"Customer", doc.custom_et_buyer, "customer_name"
-			))
-			or doc.customer_name
-			or doc.customer
-			or "ABC"
-		)
-	return doc.customer_name or doc.customer or "XYZ"
+	if kind == "seller":
+		supplier = doc.get("custom_et_supplier")
+		if supplier:
+			return frappe.db.get_value("Supplier", supplier, "supplier_name") or supplier
+		return "XYZ"
+	# buyer = the standard customer
+	return doc.get("customer_name") or doc.get("customer") or "ABC"
 
 
-def _render_confirmation_email(doc) -> str:
-	"""Pick the right template based on # of items and substitute fields."""
-	items = doc.get("items") or []
-	if len(items) <= 1:
-		return _render_single_commodity_email(doc)
-	return _render_multi_commodity_email(doc)
-
-
-def _render_single_commodity_email(doc) -> str:
+def _render_confirmation_email(doc, side: str = "seller") -> str:
+	"""Render the trade-confirmation email. `side` is "seller" or "buyer";
+	the Commission line is included only on the Seller's copy."""
 	seller = _resolve_customer_label(doc, "seller")
 	buyer = _resolve_customer_label(doc, "buyer")
 	broker = doc.get("company") or "Earthen Trading"
-	row = (doc.get("items") or [{}])[0]
 
-	parity = _format_parity(doc)
-	port_of_loading = _format_loading_port(doc)
-	commission = _format_commission(doc)
-
-	specs = (row.get("description") or "").strip()
-	specs_html = ""
-	if specs:
-		specs_html = (
-			"<p><b>Specification:</b><br>"
-			+ specs.replace("\n", "<br>")
-			+ "</p>"
+	item_blocks = []
+	for idx, row in enumerate(doc.get("items") or [], start=1):
+		item_blocks.append(
+			f"""<p><b>ITEM NO. {idx}:</b><br>
+Commodity: {_e(row.get("item_name") or row.get("item_code") or "")}<br>
+Price: {_format_price(row, doc)}<br>
+Quantity: {_format_quantity(row)}<br>
+Packaging: {_e(row.get("custom_et_packaging") or "")}<br>
+Shipping Period: {_format_shipping_period(row)}
+</p>"""
 		)
+
+	commission_line = ""
+	if side == "seller":
+		commission = _format_commission(doc)
+		if commission:
+			commission_line = f"<br>Commission: {_e(commission)}"
+
+	shared = f"""<p>
+Packaging Design: {_e(doc.get("custom_et_packaging_design") or "")}<br>
+Origin: {_e(doc.get("custom_et_origin") or "")}<br>
+Crop: {_e(doc.get("custom_et_crop") or "")}<br>
+Total Quantity: {_format_total_quantity(doc)}<br>
+Parity: {_e(_format_parity(doc))}<br>
+Port of Loading: {_e(_format_loading_port(doc))}<br>
+Payment: {_e(doc.get("custom_et_trade_payment") or "")}{commission_line}
+</p>"""
 
 	return f"""<p>Good Day!</p>
 <p>As per our discussion over whatsapp here I confirm the business as per the
@@ -188,72 +231,12 @@ following. Kindly send us the contract at your earliest.</p>
 <b>Buyer:</b> {_e(buyer)}<br>
 <b>Broker:</b> {_e(broker)}
 </p>
-<p><b>ITEM NO. 1:</b><br>
-Commodity: {_e(row.get("item_name") or row.get("item_code") or "")}<br>
-Price: {_format_price(row, doc)}<br>
-Quantity: {_format_quantity(row)}<br>
-Packaging: {_e(row.get("custom_et_packaging") or "")}<br>
-Shipping Period: {_format_shipping_period(row)}<br>
-Packaging Design: {_e(doc.get("custom_et_packaging_design") or "")}<br>
-Origin: {_e(doc.get("custom_et_origin") or "")}<br>
-Crop: {_e(doc.get("custom_et_crop") or "")}<br>
-Total Quantity: {_format_total_quantity(doc)}<br>
-Parity: {_e(parity)}<br>
-Port of Loading: {_e(port_of_loading)}<br>
-Payment: {_e(doc.get("custom_et_trade_payment") or "")}<br>
-Commission: {_e(commission)}
-</p>
-{specs_html}
-"""
-
-
-def _render_multi_commodity_email(doc) -> str:
-	seller = _resolve_customer_label(doc, "seller")
-	buyer = _resolve_customer_label(doc, "buyer")
-	broker = doc.get("company") or "Earthen Trading"
-
-	items_html_parts = []
-	for idx, row in enumerate(doc.get("items") or [], start=1):
-		commission = _format_commission(doc)
-		specs = (row.get("description") or "").strip()
-		specs_html = ""
-		if specs:
-			specs_html = (
-				"<p><b>Specifications:</b><br>"
-				+ specs.replace("\n", "<br>")
-				+ "</p>"
-			)
-		items_html_parts.append(
-			f"""<p><b>ITEM NO. {idx}:</b><br>
-Commodity: {_e(row.get("item_name") or row.get("item_code") or "")}<br>
-Price: {_format_price(row, doc)}<br>
-Quantity: {_format_quantity(row)}<br>
-Packaging: {_e(row.get("custom_et_packaging") or "")}<br>
-Shipping Period: {_format_shipping_period(row)}<br>
-Broker's Commission: {_e(commission)}
-</p>
-{specs_html}"""
-		)
-
-	parity = _format_parity(doc)
-	port_of_loading = _format_loading_port(doc)
-
-	return f"""<p>Good Day,</p>
-<p>Following our written exchange, we confirm that the following business has been
-concluded today.</p>
-<p>
-<b>Seller:</b> {_e(seller)}<br>
-<b>Buyer:</b> {_e(buyer)}<br>
-<b>Broker:</b> {_e(broker)}
-</p>
-{''.join(items_html_parts)}
-<p>
-Origin: {_e(doc.get("custom_et_origin") or "")}<br>
-Crop: {_e(doc.get("custom_et_crop") or "")}<br>
-Parity: {_e(parity)}<br>
-Port of Loading: {_e(port_of_loading)}<br>
-Payment: {_e(doc.get("custom_et_trade_payment") or "")}
-</p>
+{''.join(item_blocks)}
+{shared}
+{_buyer_info_block(doc)}
+<p>Broker Ref: {_e(doc.name or "")}</p>
+<p>For clarity, please confirm your agreement by replying to this along with the signed contract.</p>
+<p>Thank you for the business.</p>
 """
 
 
@@ -273,14 +256,25 @@ def _format_quantity(row) -> str:
 	uom = row.get("uom") or "Metric Ton"
 	if qty is None:
 		return ""
-	return f"{qty:g} {uom}"
+	out = f"{qty:g} {uom}"
+	container = (row.get("custom_et_container") or "").strip()
+	if container:
+		out += f" ({container})"
+	return out
 
 
 def _format_total_quantity(doc) -> str:
 	total = doc.get("total_qty")
 	if total is None:
 		return ""
-	return f"{total:g} Metric Ton"
+	out = f"{total:g} Metric Ton"
+	# Append the container when the order is a single line (matches the example).
+	items = doc.get("items") or []
+	if len(items) == 1:
+		container = (items[0].get("custom_et_container") or "").strip()
+		if container:
+			out += f" ({container})"
+	return out
 
 
 def _format_shipping_period(row) -> str:
@@ -315,12 +309,71 @@ def _format_loading_port(doc) -> str:
 
 
 def _format_commission(doc) -> str:
-	value = doc.get("custom_et_brokerage_commission_value") or 0
+	# The contract-level brokerage is the sum of both traders' shares (the
+	# value auto-splits between Brokerage + Co-Brokerage when a Co-Trader is
+	# set). Co defaults to 0, so single-trader deals are unaffected.
+	value = (doc.get("custom_et_brokerage_commission_value") or 0) + (
+		doc.get("custom_et_co_brokerage_commission_value") or 0
+	)
 	unit = doc.get("custom_et_brokerage_commission_unit") or "Metric Ton"
 	currency = doc.get("currency") or "USD"
 	if not value:
 		return ""
 	return f"{currency} ${value:g} per {unit} of the contract volume"
+
+
+def _buyer_info_block(doc) -> str:
+	"""Buyer (= the standard Customer) details appended at the end of the
+	confirmation email: company name, full billing address, primary contact."""
+	customer = doc.get("customer")
+	if not customer:
+		return ""
+	name = doc.get("customer_name") or customer
+
+	address_html = ""
+	addr = frappe.db.get_value("Customer", customer, "customer_primary_address")
+	if not addr:
+		try:
+			from frappe.contacts.doctype.address.address import get_default_address
+
+			addr = get_default_address("Customer", customer)
+		except Exception:
+			addr = None
+	if addr:
+		try:
+			from frappe.contacts.doctype.address.address import get_address_display
+
+			address_html = get_address_display(addr) or ""
+		except Exception:
+			address_html = ""
+
+	contact_lines: list[str] = []
+	contact_name = frappe.db.get_value("Customer", customer, "customer_primary_contact")
+	if contact_name:
+		c = (
+			frappe.db.get_value(
+				"Contact",
+				contact_name,
+				["first_name", "last_name", "email_id", "phone", "mobile_no"],
+				as_dict=True,
+			)
+			or {}
+		)
+		full = " ".join(p for p in (c.get("first_name"), c.get("last_name")) if p)
+		if full:
+			contact_lines.append(f"Contact: {_e(full)}")
+		if c.get("email_id"):
+			contact_lines.append(f"Email: {_e(c.get('email_id'))}")
+		phone = c.get("mobile_no") or c.get("phone")
+		if phone:
+			contact_lines.append(f"Phone: {_e(phone)}")
+
+	parts = [f"<b>{_e(name)}</b>"]
+	if address_html:
+		parts.append(address_html)  # already-formatted HTML from get_address_display
+	if contact_lines:
+		parts.append("<br>".join(contact_lines))
+	return "<p><b>Buyer Details:</b><br>" + "<br>".join(parts) + "</p>"
 
 
 def _e(s) -> str:

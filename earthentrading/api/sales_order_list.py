@@ -41,7 +41,7 @@ def search(mine: int = 1, status: str | None = None, limit: int = 200):
 			so.name,
 			so.customer,
 			so.customer_name,
-			so.custom_et_buyer AS buyer,
+			so.custom_et_supplier AS supplier,
 			so.custom_et_contract_type AS contract_type,
 			so.custom_et_assigned_trader AS assigned_trader,
 			so.workflow_state,

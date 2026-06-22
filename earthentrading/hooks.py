@@ -158,6 +158,12 @@ doc_events = {
 		"validate": "earthentrading.events.sales_order.validate",
 		"before_submit": "earthentrading.events.sales_order.before_submit",
 	},
+	"Customer": {
+		"validate": "earthentrading.events.party.sync_party_emails",
+	},
+	"Supplier": {
+		"validate": "earthentrading.events.party.sync_party_emails",
+	},
 	"Project": {
 		"after_insert": "earthentrading.events.project.after_insert",
 		"on_update": "earthentrading.events.project.on_update",

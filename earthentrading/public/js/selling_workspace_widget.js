@@ -53,6 +53,36 @@
 			<div id="${WIDGET_ID}" class="et-selling-widget"
 				style="margin:16px 0 24px; padding:16px; border:1px solid var(--border-color); border-radius:8px;">
 				<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:12px; flex-wrap:wrap;">
+					<h5 style="margin:0; font-weight:600;">Selling KPIs</h5>
+					<label style="display:flex; align-items:center; gap:6px; margin:0; font-size:13px;">
+						Period
+						<select class="form-control input-sm" id="et-kpi-period" style="max-width:160px">
+							<option value="this_month">This Month</option>
+							<option value="this_quarter">This Quarter</option>
+							<option value="this_year" selected>This Year</option>
+							<option value="last_year">Last Year</option>
+							<option value="all">All Time</option>
+						</select>
+					</label>
+				</div>
+				<div style="display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; margin-bottom:20px;">
+					<div style="flex:0 0 240px; border:1px solid var(--border-color); border-radius:8px; padding:14px;">
+						<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+							<span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em;">Total Book Value</span>
+							<select class="form-control input-sm" id="et-bv-status" style="max-width:120px; font-size:11px;">
+								<option value="Estimated" selected>Estimated</option>
+								<option value="Paid">Paid</option>
+							</select>
+						</div>
+						<div id="et-bv-value" style="font-size:24px; font-weight:600;">—</div>
+						<small class="text-muted" id="et-bv-count"></small>
+					</div>
+					<div style="flex:1; min-width:320px; border:1px solid var(--border-color); border-radius:8px; padding:14px;">
+						<div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px;">Trader-wise Revenue</div>
+						<div id="et-trader-rev"><span class="text-muted" style="font-size:13px;">Loading…</span></div>
+					</div>
+				</div>
+				<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:12px; flex-wrap:wrap;">
 					<h5 style="margin:0; font-weight:600;">My Sales Orders</h5>
 					<div style="display:flex; align-items:center; gap:12px;">
 						<label style="display:flex; align-items:center; gap:6px; margin:0; font-size:13px;">
@@ -78,7 +108,7 @@
 							<tr>
 								<th>Sales Order</th>
 								<th>Customer</th>
-								<th>Buyer</th>
+								<th>Supplier</th>
 								<th>Contract</th>
 								<th>Assigned Trader</th>
 								<th>Workflow State</th>
@@ -119,11 +149,79 @@
 
 		bind($widget);
 		refresh($widget);
+		refreshKpis($widget);
 	}
 
 	function bind($w) {
 		$("#et-so-only-mine", $w).on("change", () => refresh($w));
 		$("#et-so-status", $w).on("change", () => refresh($w));
+		$("#et-kpi-period", $w).on("change", () => refreshKpis($w));
+		$("#et-bv-status", $w).on("change", () => refreshKpis($w));
+	}
+
+	function fmtCurrency(v, c) {
+		try {
+			return format_currency(v, c);
+		} catch (e) {
+			return (c ? c + " " : "") + formatNumber(Math.round(v || 0));
+		}
+	}
+
+	function refreshKpis($w) {
+		const period = $("#et-kpi-period", $w).val() || "this_year";
+		const status = $("#et-bv-status", $w).val() || "Estimated";
+
+		$("#et-bv-value", $w).text("…");
+		frappe
+			.call({
+				method: "earthentrading.api.selling_kpis.book_value",
+				args: { period, status },
+			})
+			.then((r) => {
+				const m = (r && r.message) || {};
+				$("#et-bv-value", $w).text(fmtCurrency(m.value || 0, m.currency));
+				$("#et-bv-count", $w).text(
+					`${m.count || 0} order${m.count === 1 ? "" : "s"} · ${status}`
+				);
+			})
+			.catch(() => $("#et-bv-value", $w).text("Error"));
+
+		frappe
+			.call({
+				method: "earthentrading.api.selling_kpis.trader_revenue",
+				args: { period },
+			})
+			.then((r) => renderTraderRevenue($w, (r && r.message) || {}))
+			.catch(() => {
+				$("#et-trader-rev", $w).html(
+					'<span class="text-muted" style="font-size:13px;">Error loading revenue.</span>'
+				);
+			});
+	}
+
+	function renderTraderRevenue($w, m) {
+		const $body = $("#et-trader-rev", $w).empty();
+		const rows = (m && m.rows) || [];
+		if (!rows.length) {
+			$body.append(
+				'<span class="text-muted" style="font-size:13px;">No trader revenue in this period.</span>'
+			);
+			return;
+		}
+		const max = Math.max.apply(null, rows.map((r) => r.revenue || 0)) || 1;
+		rows.forEach((r) => {
+			const pct = Math.max(2, Math.round(((r.revenue || 0) / max) * 100));
+			$body.append(`
+				<div style="margin-bottom:9px;">
+					<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">
+						<span>${escapeHtml(r.full_name)}</span>
+						<span style="font-weight:600;">${escapeHtml(fmtCurrency(r.revenue, m.currency))}</span>
+					</div>
+					<div style="height:6px; background:var(--control-bg, #eee); border-radius:4px; overflow:hidden;">
+						<div style="height:6px; width:${pct}%; background:var(--blue-500, #4a90e2);"></div>
+					</div>
+				</div>`);
+		});
 	}
 
 	function refresh($w) {
@@ -175,7 +273,7 @@
 				<tr>
 					<td><a href="/app/sales-order/${encodeURIComponent(r.name)}">${escapeHtml(r.name)}</a></td>
 					<td>${escapeHtml(r.customer_name || r.customer || "")}</td>
-					<td>${escapeHtml(r.buyer || "")}</td>
+					<td>${escapeHtml(r.supplier || "")}</td>
 					<td>${escapeHtml(r.contract_type || "")}</td>
 					<td>${escapeHtml(r.assigned_trader || "")}</td>
 					<td><span class="indicator-pill ${wsBg}" style="padding:2px 8px; border-radius:9999px; font-size:11px; background-color:var(--${wsBg}-bg, #eee); color:var(--${wsBg}-text, #333);">${escapeHtml(wsLabel)}</span></td>

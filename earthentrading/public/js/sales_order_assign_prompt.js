@@ -26,6 +26,9 @@
 				filters: { order_type: "Trade Contract", docstatus: 1 },
 			}));
 
+			// Preview the buyer + seller trade emails (with their To / CC).
+			frm.add_custom_button(__("Preview Trade Email"), () => openEmailPreview(frm));
+
 			// (3) State-driven action buttons on submitted SOs.
 			if (frm.doc.docstatus === 1) {
 				addLifecycleButtons(frm);
@@ -55,6 +58,151 @@
 			maybeOpenDialog(frm);
 		},
 	});
+
+	// --- Commission split + email-recipient auto-fill -----------------------
+	frappe.ui.form.on("Sales Order", {
+		custom_et_brokerage_commission_value(frm) {
+			splitCommission(frm);
+		},
+		custom_et_co_trader(frm) {
+			// Co-trader set while a commission already exists → split it now.
+			if (frm.doc.custom_et_co_trader && flt(frm.doc.custom_et_brokerage_commission_value)) {
+				splitCommission(frm);
+			}
+		},
+		customer(frm) {
+			dropRecipientSide(frm, "Customer");
+			fillRecipients(frm);
+		},
+		custom_et_supplier(frm) {
+			dropRecipientSide(frm, "Supplier");
+			fillRecipients(frm);
+		},
+	});
+
+	// Split the entered total 50/50 across Brokerage + Co-Brokerage when a
+	// Co-Trader is present. Re-entrancy guarded because set_value re-fires the
+	// field's own change handler synchronously.
+	function splitCommission(frm) {
+		if (frm.__et_splitting) return;
+		if (!frm.doc.custom_et_co_trader) return;
+		const total = flt(frm.doc.custom_et_brokerage_commission_value);
+		const half = total / 2;
+		frm.__et_splitting = true;
+		frm.set_value("custom_et_brokerage_commission_value", half);
+		frm.set_value("custom_et_co_brokerage_commission_value", total - half);
+		frm.__et_splitting = false;
+	}
+
+	// Pull the candidate recipient rows for the chosen Customer + Supplier and
+	// merge in any that aren't already present (preserving existing rows + their
+	// Primary/CC ticks). Server validate is the source of truth on save.
+	function fillRecipients(frm) {
+		const customer = frm.doc.customer;
+		const supplier = frm.doc.custom_et_supplier;
+		if (!customer && !supplier) return;
+		frappe.call({
+			method: "earthentrading.api.recipients.get_recipient_candidates",
+			args: { customer: customer || null, supplier: supplier || null },
+			callback(r) {
+				if (!r || !r.message) return;
+				mergeRecipients(frm, r.message.rows || []);
+				const counts = r.message.user_counts || {};
+				const multi = [];
+				if ((counts.Customer || 0) > 1) multi.push(__("Customer"));
+				if ((counts.Supplier || 0) > 1) multi.push(__("Supplier"));
+				if (multi.length) {
+					frappe.show_alert(
+						{
+							message: __("Multiple people work with the {0} — review the CC list.", [
+								multi.join(__(" and ")),
+							]),
+							indicator: "orange",
+						},
+						7
+					);
+				}
+			},
+		});
+	}
+
+	function recipientKey(d) {
+		return (d.party_side || "") + "|" + (d.email || "").trim().toLowerCase();
+	}
+
+	function mergeRecipients(frm, rows) {
+		const existing = frm.doc.custom_et_email_recipients || [];
+		const seen = new Set(existing.map(recipientKey));
+		let added = 0;
+		rows.forEach((row) => {
+			const key = recipientKey(row);
+			if (seen.has(key)) return;
+			seen.add(key);
+			const child = frm.add_child("custom_et_email_recipients");
+			child.party_side = row.party_side;
+			child.source = row.source;
+			child.recipient_name = row.recipient_name;
+			child.email = row.email;
+			child.is_primary = row.is_primary;
+			child.is_cc = row.is_cc;
+			added += 1;
+		});
+		if (added) frm.refresh_field("custom_et_email_recipients");
+	}
+
+	// When a party link changes, drop that side's rows so stale recipients from
+	// the previously selected Customer/Supplier don't linger in the grid (mirrors
+	// the server-side reconcile).
+	function dropRecipientSide(frm, side) {
+		const rows = frm.doc.custom_et_email_recipients || [];
+		const keep = rows.filter((d) => d.party_side !== side);
+		if (keep.length === rows.length) return;
+		keep.forEach((d, i) => {
+			d.idx = i + 1;
+		});
+		frm.doc.custom_et_email_recipients = keep;
+		frm.refresh_field("custom_et_email_recipients");
+	}
+
+	function openEmailPreview(frm) {
+		frappe.call({
+			method: "earthentrading.api.email_preview.preview",
+			args: { doc: JSON.stringify(frm.doc) },
+			freeze: true,
+			freeze_message: __("Rendering email preview…"),
+			callback(r) {
+				if (!r || !r.message) return;
+				const m = r.message;
+				const esc = (s) => frappe.utils.escape_html(s || "");
+				const recips = (label, list, emptyText) =>
+					`<div><b>${label}:</b> ${
+						list && list.length
+							? esc(list.join(", "))
+							: `<span style="color:var(--text-muted)">${emptyText}</span>`
+					}</div>`;
+				const card = (title, d) => `
+					<div style="margin-bottom:20px;">
+						<div style="font-weight:600; margin-bottom:6px;">${esc(title)}</div>
+						<div style="font-size:12px; margin-bottom:8px; line-height:1.6;">
+							${recips(__("To"), d.to, __("none — nobody is ticked Primary on this side"))}
+							${recips(__("CC"), d.cc, "—")}
+							<div><b>${__("Subject")}:</b> ${esc(d.subject)}</div>
+						</div>
+						<div style="border:1px solid var(--border-color); border-radius:6px; padding:14px; background:var(--card-bg); max-height:360px; overflow:auto;">${d.html}</div>
+					</div>`;
+				const dlg = new frappe.ui.Dialog({
+					title: __("Trade Email Preview"),
+					size: "extra-large",
+					fields: [{ fieldtype: "HTML", fieldname: "body" }],
+				});
+				dlg.fields_dict.body.$wrapper.html(
+					card(__("Buyer email → Customer ({0})", [m.buyer.party]), m.buyer) +
+						card(__("Seller email → Supplier ({0})", [m.seller.party]), m.seller)
+				);
+				dlg.show();
+			},
+		});
+	}
 
 	function addLifecycleButtons(frm) {
 		const ws = frm.doc.workflow_state;

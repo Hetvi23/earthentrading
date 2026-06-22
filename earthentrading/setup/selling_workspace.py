@@ -10,7 +10,6 @@ import secrets
 import frappe
 
 from earthentrading.setup.dashboard import (
-	CHART_TRADES_BY_ITEM,
 	CHART_TRADES_MT,
 	ensure_earth_trading_dashboard,
 )
@@ -43,7 +42,7 @@ def ensure_selling_workspace():
 	ws.quick_lists = []
 
 	ws.charts = []
-	for chart_name in (CHART_TRADES_MT, CHART_TRADES_BY_ITEM):
+	for chart_name in (CHART_TRADES_MT,):
 		ws.append(
 			"charts",
 			{
@@ -77,12 +76,6 @@ def _build_selling_content_json() -> str:
 		id=_block_id(),
 		type="chart",
 		data={"chart_name": CHART_TRADES_MT, "col": 12},
-	)
-	push(id=_block_id(), type="spacer", data={"col": 12})
-	push(
-		id=_block_id(),
-		type="chart",
-		data={"chart_name": CHART_TRADES_BY_ITEM, "col": 12},
 	)
 
 	return json.dumps(blocks)

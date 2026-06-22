@@ -21,6 +21,11 @@ CHART_TRADES_MT = "Earth Trading - Trades in MT"
 CHART_TRADES_BY_ITEM = "Earth Trading - Trades By Item"
 
 
+# Charts that used to exist and are now removed; deleted on migrate so they
+# don't linger on the Selling workspace.
+LEGACY_CHARTS = [CHART_TRADES_BY_ITEM]
+
+
 def _chart_defs():
 	return [
 		{
@@ -42,31 +47,20 @@ def _chart_defs():
 				]
 			),
 		},
-		{
-			"chart_name": CHART_TRADES_BY_ITEM,
-			"chart_type": "Group By",
-			"document_type": "Sales Order Item",
-			"parent_document_type": "Sales Order",
-			"group_by_type": "Sum",
-			"group_by_based_on": "item_name",
-			"aggregate_function_based_on": "qty",
-			"type": "Bar",
-			"timespan": "Last Year",
-			"is_public": 1,
-			"module": MODULE,
-			"number_of_groups": 10,
-			"filters_json": json.dumps(
-				[
-					["Sales Order Item", "docstatus", "=", 1],
-				]
-			),
-		},
 	]
 
 
 def ensure_earth_trading_dashboard():
 	if not frappe.db.exists("DocType", "Dashboard Chart"):
 		return
+
+	# Drop charts we no longer ship (e.g. the commodity-wise "Trades By Item").
+	for legacy in LEGACY_CHARTS:
+		if frappe.db.exists("Dashboard Chart", legacy):
+			try:
+				frappe.delete_doc("Dashboard Chart", legacy, force=True, ignore_permissions=True)
+			except Exception:
+				frappe.log_error(frappe.get_traceback(), "earthentrading.drop_legacy_chart")
 
 	for spec in _chart_defs():
 		name = spec["chart_name"]

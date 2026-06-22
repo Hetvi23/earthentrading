@@ -5,6 +5,7 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 from earthentrading.setup.custom_fields import CUSTOM_FIELDS
+from earthentrading.setup.field_order import ensure_sales_order_field_order
 from earthentrading.setup.dashboard import ensure_earth_trading_dashboard
 from earthentrading.setup.lead_functions import ensure_lead_functions
 from earthentrading.setup.lead_layout import apply_lead_layout
@@ -41,6 +42,10 @@ def after_migrate():
 
 def _install_all():
 	create_custom_fields(CUSTOM_FIELDS, update=True)
+	try:
+		ensure_sales_order_field_order()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_sales_order_field_order")
 	try:
 		ensure_property_setters()
 	except Exception:

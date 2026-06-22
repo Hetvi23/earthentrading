@@ -276,22 +276,15 @@ CUSTOM_FIELDS = {
 			"fieldtype": "Link",
 			"options": "User",
 			"label": "Assigned Trader",
+			"description": "The other trader on this deal. The order's creator is the first trader; when an Assigned Trader is set the commission is split 50/50 between them.",
 			"insert_after": "custom_et_trading_section",
-		},
-		{
-			"fieldname": "custom_et_co_trader",
-			"fieldtype": "Link",
-			"options": "User",
-			"label": "Co-Trader",
-			"description": "Second trader sharing this deal (optional).",
-			"insert_after": "custom_et_assigned_trader",
 		},
 		{
 			"fieldname": "custom_et_deal_type",
 			"fieldtype": "Select",
 			"label": "Deal Type",
 			"options": "\nBrokerage\nPrincipal",
-			"insert_after": "custom_et_co_trader",
+			"insert_after": "custom_et_assigned_trader",
 		},
 		# --- Top section additions to match the operations layout ----------
 		# Standard SO already has 3 columns in the Customer section
@@ -396,7 +389,7 @@ CUSTOM_FIELDS = {
 			"fieldtype": "Select",
 			"label": "Packaging Design",
 			"options": "\nSeller's Design\nBuyer's Design\nNeutral",
-			"insert_after": "custom_et_origin",
+			"insert_after": "custom_et_operations_cb",
 			"reqd": 1,
 		},
 		{
@@ -522,7 +515,7 @@ CUSTOM_FIELDS = {
 			"fieldname": "custom_et_commission_pct",
 			"fieldtype": "Percent",
 			"label": "Commission %",
-			"description": "Earth Trading: this trader's share of the gross brokerage commission on deals where they are the trader / co-trader.",
+			"description": "Earth Trading: this trader's commission rate on deals they create. Applied to the order value to compute the deal's commission (e.g. 10% of 15,000 = 1,500); split 50/50 when an Assigned Trader is set.",
 			"insert_after": "user_type",
 		},
 	],

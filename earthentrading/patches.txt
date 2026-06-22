@@ -16,3 +16,5 @@ earthentrading.patches.drop_party_email_data_fields
 # Trade Payment Small Text -> Link (Payment Terms Template); drop old field so
 # create_custom_fields re-adds it as a Link.
 earthentrading.patches.convert_trade_payment_to_link
+# Single-trader model: drop the Sales Order Co-Trader field.
+earthentrading.patches.drop_co_trader_field

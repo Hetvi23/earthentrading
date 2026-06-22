@@ -215,15 +215,15 @@ def ensure_sales_order_workflow():
 			return
 
 	edit_role = "Sales User" if frappe.db.exists("Role", "Sales User") else "System Manager"
-	# Two-step trader approval: the deal's own trader (Assigned Trader / Co-Trader)
-	# approves first (Trader Review), then the Trader Manager (Trader Manager
-	# Review, where the buyer/seller email fires).
+	# Two-step trader approval: the deal's own traders (the order's creator and
+	# the Assigned Trader) approve first (Trader Review), then the Trader Manager
+	# (Trader Manager Review, where the buyer/seller email fires).
 	trader_role = "ET Trader" if frappe.db.exists("Role", "ET Trader") else "Sales Manager"
 	trader_mgr_role = "ET Trader Manager" if frappe.db.exists("Role", "ET Trader Manager") else "Sales Manager"
 	final_role = "ET Operations" if frappe.db.exists("Role", "ET Operations") else "Sales Manager"
 	accounts_role = "Accounts User" if frappe.db.exists("Role", "Accounts User") else "System Manager"
-	# Restrict the first approval to the specific traders named on the SO.
-	trader_match = "frappe.session.user in (doc.custom_et_assigned_trader, doc.custom_et_co_trader)"
+	# Restrict the first approval to the deal's traders (creator or Assigned Trader).
+	trader_match = "frappe.session.user in (doc.custom_et_assigned_trader, doc.owner)"
 
 	name = "Earth Trading Sales Order"
 	if frappe.db.exists("Workflow", name):

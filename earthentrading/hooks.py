@@ -28,7 +28,7 @@ add_to_apps_screen = [
 # app_include_css = "/assets/earthentrading/css/earthentrading.css"
 app_include_js = [
 	"/assets/earthentrading/js/trade_report_widget.js?v=3",
-	"/assets/earthentrading/js/selling_workspace_widget.js?v=1",
+	"/assets/earthentrading/js/selling_workspace_widget.js?v=2",
 ]
 
 # include js, css files in header of web template

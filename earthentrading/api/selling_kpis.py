@@ -107,11 +107,8 @@ def trader_revenue(period: str = "this_year") -> dict:
 	where, values = _submitted_so_where(period)
 	sos = frappe.db.sql(
 		f"""
-		SELECT name, total_qty, conversion_rate,
-		       custom_et_brokerage_commission_value AS brokerage,
-		       custom_et_co_brokerage_commission_value AS co_brokerage,
-		       custom_et_assigned_trader AS assigned_trader,
-		       custom_et_co_trader AS co_trader
+		SELECT name, owner, base_grand_total,
+		       custom_et_assigned_trader AS assigned_trader
 		FROM `tabSales Order` WHERE {where}
 		""",
 		values,
@@ -129,18 +126,17 @@ def trader_revenue(period: str = "this_year") -> dict:
 
 	revenue: dict[str, float] = {}
 	for so in sos:
-		rate = flt(so.brokerage) + flt(so.co_brokerage)  # per-unit commission
-		if rate <= 0:
-			continue
-		# gross in company currency
-		gross = flt(so.total_qty) * rate * (flt(so.conversion_rate) or 1.0)
+		# The deal's commission = the order creator's Commission % of the order
+		# value (company currency). e.g. 10% of 15,000 = 1,500.
+		gross = flt(so.base_grand_total) * commission_pct(so.owner) / 100.0
 		if gross <= 0:
 			continue
-		for user in (so.assigned_trader, so.co_trader):
-			pct = commission_pct(user)
-			if not user or pct <= 0:
-				continue
-			revenue[user] = revenue.get(user, 0.0) + gross * pct / 100.0
+		# Split equally between the deal's traders: the creator and the Assigned
+		# Trader, de-duped. One trader takes the full amount; two split it 50/50.
+		traders = {so.owner, so.assigned_trader} - {None, ""}
+		share = gross / len(traders)
+		for user in traders:
+			revenue[user] = revenue.get(user, 0.0) + share
 
 	rows = [
 		{

@@ -59,17 +59,8 @@
 		},
 	});
 
-	// --- Commission split + email-recipient auto-fill -----------------------
+	// --- Email-recipient auto-fill ------------------------------------------
 	frappe.ui.form.on("Sales Order", {
-		custom_et_brokerage_commission_value(frm) {
-			splitCommission(frm);
-		},
-		custom_et_co_trader(frm) {
-			// Co-trader set while a commission already exists → split it now.
-			if (frm.doc.custom_et_co_trader && flt(frm.doc.custom_et_brokerage_commission_value)) {
-				splitCommission(frm);
-			}
-		},
 		customer(frm) {
 			dropRecipientSide(frm, "Customer");
 			fillRecipients(frm);
@@ -79,20 +70,6 @@
 			fillRecipients(frm);
 		},
 	});
-
-	// Split the entered total 50/50 across Brokerage + Co-Brokerage when a
-	// Co-Trader is present. Re-entrancy guarded because set_value re-fires the
-	// field's own change handler synchronously.
-	function splitCommission(frm) {
-		if (frm.__et_splitting) return;
-		if (!frm.doc.custom_et_co_trader) return;
-		const total = flt(frm.doc.custom_et_brokerage_commission_value);
-		const half = total / 2;
-		frm.__et_splitting = true;
-		frm.set_value("custom_et_brokerage_commission_value", half);
-		frm.set_value("custom_et_co_brokerage_commission_value", total - half);
-		frm.__et_splitting = false;
-	}
 
 	// Pull the candidate recipient rows for the chosen Customer + Supplier and
 	// merge in any that aren't already present (preserving existing rows + their

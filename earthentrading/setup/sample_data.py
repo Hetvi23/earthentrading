@@ -448,7 +448,6 @@ def _ensure_sales_orders():
 				"custom_et_brokerage_commission_value": 20,
 				"custom_et_co_brokerage_commission_value": 0,
 				"custom_et_insurance_value": 0,
-				"custom_et_brokerage_commission_unit": uom,
 				"custom_et_trade_payment": "100% against scanned documents",
 				"custom_et_port_of_loading": port_loading,
 				"custom_et_origin": _country_or_none(origin),

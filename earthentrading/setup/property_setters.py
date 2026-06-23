@@ -60,6 +60,9 @@ PROPERTY_SETTERS = [
 	("Sales Order", "delivery_date", "reqd", "0", "Check"),
 	# Same for the items table's per-row delivery_date.
 	("Sales Order Item", "delivery_date", "reqd", "0", "Check"),
+	# Trade quantities are in Metric Ton — default the item UOM accordingly.
+	("Sales Order Item", "uom", "default", "Metric Ton", "Data"),
+	("Sales Order Item", "stock_uom", "default", "Metric Ton", "Data"),
 	# Keep the Items grid to: Item Code, Shipping Start/End, Qty, Rate, Amount —
 	# hide delivery_date and warehouse columns (still editable in the row).
 	("Sales Order Item", "delivery_date", "in_list_view", "0", "Check"),
@@ -87,6 +90,15 @@ PROPERTY_SETTERS = [
 
 
 def ensure_property_setters():
+	# The default UOM property setters point at "Metric Ton"; make sure it exists.
+	if not frappe.db.exists("UOM", "Metric Ton"):
+		try:
+			frappe.get_doc({"doctype": "UOM", "uom_name": "Metric Ton"}).insert(
+				ignore_permissions=True
+			)
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), "earthentrading.ensure_metric_ton_uom")
+
 	for doctype, fieldname, prop, value, prop_type in PROPERTY_SETTERS:
 		try:
 			make_property_setter(

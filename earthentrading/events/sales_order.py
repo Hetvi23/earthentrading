@@ -309,17 +309,14 @@ def _format_loading_port(doc) -> str:
 
 
 def _format_commission(doc) -> str:
-	# The contract-level brokerage is the sum of both traders' shares (the
-	# value auto-splits between Brokerage + Co-Brokerage when a Co-Trader is
-	# set). Co defaults to 0, so single-trader deals are unaffected.
+	# Contract-level brokerage = Brokerage + Co-Brokerage (per Metric Ton).
 	value = (doc.get("custom_et_brokerage_commission_value") or 0) + (
 		doc.get("custom_et_co_brokerage_commission_value") or 0
 	)
-	unit = doc.get("custom_et_brokerage_commission_unit") or "Metric Ton"
 	currency = doc.get("currency") or "USD"
 	if not value:
 		return ""
-	return f"{currency} ${value:g} per {unit} of the contract volume"
+	return f"{currency} ${value:g} per Metric Ton of the contract volume"
 
 
 def _buyer_info_block(doc) -> str:

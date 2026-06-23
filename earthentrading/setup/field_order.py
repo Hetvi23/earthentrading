@@ -20,7 +20,6 @@ SALES_ORDER_FIELD_ORDER = [
 	"custom_et_brokerage_commission_value",
 	"custom_et_co_brokerage_commission_value",
 	"custom_et_insurance_value",
-	"custom_et_brokerage_commission_unit",
 	"custom_et_trade_payment",
 	"custom_et_origin",
 	"custom_et_port_of_loading",

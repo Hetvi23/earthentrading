@@ -18,3 +18,5 @@ earthentrading.patches.drop_party_email_data_fields
 earthentrading.patches.convert_trade_payment_to_link
 # Single-trader model: drop the Sales Order Co-Trader field.
 earthentrading.patches.drop_co_trader_field
+# Commission is always per Metric Ton; drop the unit selector field.
+earthentrading.patches.drop_brokerage_commission_unit

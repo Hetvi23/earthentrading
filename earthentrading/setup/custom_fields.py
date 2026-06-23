@@ -182,6 +182,21 @@ CUSTOM_FIELDS = {
 			"description": "Internal users who deal with this customer (CC'd on trade emails).",
 			"insert_after": "custom_et_emails",
 		},
+		{
+			"fieldname": "custom_et_bank_section",
+			"fieldtype": "Section Break",
+			"label": "Bank Accounts",
+			"insert_after": "custom_et_dealing_users",
+			"collapsible": 1,
+		},
+		{
+			"fieldname": "custom_et_bank_accounts",
+			"fieldtype": "Table",
+			"label": "Bank Accounts",
+			"options": "ET Bank Account",
+			"description": "Bank / wire-transfer details for this customer. Tick Primary for the main account.",
+			"insert_after": "custom_et_bank_section",
+		},
 	],
 	"Supplier": [
 		{
@@ -229,6 +244,21 @@ CUSTOM_FIELDS = {
 			"options": "ET Party User",
 			"description": "Internal users who deal with this supplier (CC'd on trade emails).",
 			"insert_after": "custom_et_emails",
+		},
+		{
+			"fieldname": "custom_et_bank_section",
+			"fieldtype": "Section Break",
+			"label": "Bank Accounts",
+			"insert_after": "custom_et_dealing_users",
+			"collapsible": 1,
+		},
+		{
+			"fieldname": "custom_et_bank_accounts",
+			"fieldtype": "Table",
+			"label": "Bank Accounts",
+			"options": "ET Bank Account",
+			"description": "Bank / wire-transfer details for this supplier. Tick Primary for the main account.",
+			"insert_after": "custom_et_bank_section",
 		},
 	],
 	"Quotation": [

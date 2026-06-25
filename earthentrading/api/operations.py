@@ -5,7 +5,7 @@
 - assign_team_member: Operations picks a user, optionally a task template,
   grants the user view + write access to the SO via Frappe Share, creates
   the linked Project, spawns the checklist tasks, and transitions the SO
-  workflow from "Pending Assignment" to "In Progress".
+  workflow from "Pending Assignment" to "Person Assigned".
 - raise_claim: Completed → Claim (flags a post-completion issue).
 - resolve_claim: Claim → Completed (closes the order again; no re-run of operations).
 """
@@ -70,12 +70,12 @@ def assign_team_member(sales_order: str, user: str, template: str | None = None)
 	if template:
 		project_name = _ensure_project_for_so(so, template, user)
 
-	# 4. Transition the SO to In Progress.
+	# 4. Transition the SO to Person Assigned.
 	frappe.db.set_value(
 		"Sales Order",
 		sales_order,
 		"workflow_state",
-		"In Progress",
+		"Person Assigned",
 		update_modified=False,
 	)
 	frappe.db.commit()

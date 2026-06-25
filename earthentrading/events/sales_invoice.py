@@ -2,7 +2,7 @@
 # License: MIT. See license.txt
 
 """When every Sales Invoice for a Sales Order is fully paid, auto-transition
-the SO workflow from Raise Invoice → Completed."""
+the SO workflow from Tasks Completed → Completed."""
 
 import frappe
 
@@ -42,8 +42,8 @@ def _maybe_complete_linked_sales_orders(si_doc):
 
 def _maybe_complete_sales_order(sales_order_name: str):
 	ws = frappe.db.get_value("Sales Order", sales_order_name, "workflow_state")
-	if ws != "Raise Invoice":
-		# Only transition from Raise Invoice. If SO is still In Progress or
+	if ws != "Tasks Completed":
+		# Only transition from Tasks Completed. If SO is still Person Assigned or
 		# already Completed, do nothing.
 		return
 

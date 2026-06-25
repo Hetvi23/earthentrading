@@ -12,12 +12,12 @@ from earthentrading.utils import (
 
 # States that mean the SO has cleared approval. before_submit lets any of
 # these through (only "Pending Assignment" actually flips docstatus=1 the
-# first time, but a doc could land in In Progress / Raise Invoice / etc.
+# first time, but a doc could land in Person Assigned / Tasks Completed / etc.
 # from later transitions).
 POST_APPROVAL_STATES = {
 	"Pending Assignment",
-	"In Progress",
-	"Raise Invoice",
+	"Person Assigned",
+	"Tasks Completed",
 	"Completed",
 	"Claim",
 }
@@ -127,9 +127,7 @@ def _send_side_email(doc, side: str, party_side: str):
 	if not to and not cc:
 		return
 	body = _render_confirmation_email(doc, side)
-	subject = _("Trade Confirmation — {0} ({1})").format(
-		doc.name, _resolve_customer_label(doc, side)
-	)
+	subject = _email_subject(doc)
 	try:
 		frappe.sendmail(
 			# If no row is ticked Primary, fall back to sending to the CC list.
@@ -145,6 +143,30 @@ def _send_side_email(doc, side: str, party_side: str):
 		frappe.log_error(
 			frappe.get_traceback(), "earthentrading.sales_order.approval_email"
 		)
+
+
+def _email_subject(doc) -> str:
+	"""Subject shared by the buyer & seller emails:
+	<SO ID> - <Buyer> - <Seller> - <Commodity> - <Shipping period> - <Port of delivery>.
+
+	Commodity and shipping period come from the first item; port of delivery is
+	the port of destination. Empty parts are dropped so the line stays clean."""
+	items = doc.get("items") or []
+	first = items[0] if items else None
+	commodity = ""
+	shipping = ""
+	if first is not None:
+		commodity = first.get("item_name") or first.get("item_code") or ""
+		shipping = _format_shipping_period(first)
+	parts = [
+		doc.get("name") or _("Draft"),
+		_resolve_customer_label(doc, "buyer"),
+		_resolve_customer_label(doc, "seller"),
+		commodity,
+		shipping,
+		doc.get("custom_et_port_of_destination") or "",
+	]
+	return " - ".join(str(p) for p in parts if p)
 
 
 def _collect_to_cc(doc, side: str | None = None) -> tuple[list[str], list[str]]:
@@ -256,7 +278,7 @@ def _format_quantity(row) -> str:
 	uom = row.get("uom") or "Metric Ton"
 	if qty is None:
 		return ""
-	out = f"{qty:g} {uom}"
+	out = f"{qty:g} {uom} (+/- 5%)"
 	container = (row.get("custom_et_container") or "").strip()
 	if container:
 		out += f" ({container})"
@@ -267,7 +289,7 @@ def _format_total_quantity(doc) -> str:
 	total = doc.get("total_qty")
 	if total is None:
 		return ""
-	out = f"{total:g} Metric Ton"
+	out = f"{total:g} Metric Ton (+/- 5%)"
 	# Append the container when the order is a single line (matches the example).
 	items = doc.get("items") or []
 	if len(items) == 1:

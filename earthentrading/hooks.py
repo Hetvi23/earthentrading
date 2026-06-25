@@ -169,7 +169,7 @@ doc_events = {
 		"on_update": "earthentrading.events.project.on_update",
 	},
 	"Task": {
-		# Auto-transition linked SO to "Raise Invoice" once every task on the
+		# Auto-transition linked SO to "Tasks Completed" once every task on the
 		# project is Completed/Cancelled.
 		"on_update": "earthentrading.events.task.on_update",
 	},

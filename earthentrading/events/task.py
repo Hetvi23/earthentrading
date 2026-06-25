@@ -2,7 +2,7 @@
 # License: MIT. See license.txt
 
 """When the last open task on a project-linked Sales Order is completed,
-auto-transition the SO workflow from In Progress → Raise Invoice."""
+auto-transition the SO workflow from Person Assigned → Tasks Completed."""
 
 import frappe
 
@@ -33,9 +33,9 @@ def on_update(doc, method):
 
 	so_name = project["sales_order"]
 	ws = frappe.db.get_value("Sales Order", so_name, "workflow_state")
-	if ws != "In Progress":
-		# Only transition from In Progress. Defensive — if SO is already in
-		# Raise Invoice / Completed / Claim / etc., don't bounce it backwards.
+	if ws != "Person Assigned":
+		# Only transition from Person Assigned. Defensive — if SO is already in
+		# Tasks Completed / Completed / Claim / etc., don't bounce it backwards.
 		return
 
 	# Check remaining open tasks on the project.
@@ -46,13 +46,13 @@ def on_update(doc, method):
 	if remaining > 0:
 		return
 
-	# All tasks done — flip SO to Raise Invoice.
+	# All tasks done — flip SO to Tasks Completed.
 	try:
 		frappe.db.set_value(
 			"Sales Order",
 			so_name,
 			"workflow_state",
-			"Raise Invoice",
+			"Tasks Completed",
 			update_modified=False,
 		)
 		# Also close the project so it's clearly finished.

@@ -15,6 +15,7 @@ from frappe import _
 
 from earthentrading.events.sales_order import (
 	_collect_to_cc,
+	_email_subject,
 	_render_confirmation_email,
 	_resolve_customer_label,
 )
@@ -29,6 +30,8 @@ def preview(sales_order: str | None = None, doc: str | None = None) -> dict:
 	else:
 		frappe.throw(_("Provide a Sales Order to preview."))
 
+	# Same subject for both copies — only the body's Commission line differs.
+	subject = _email_subject(so)
 	out = {}
 	for side, party_side in (("buyer", "Customer"), ("seller", "Supplier")):
 		to, cc = _collect_to_cc(so, party_side)
@@ -36,9 +39,7 @@ def preview(sales_order: str | None = None, doc: str | None = None) -> dict:
 			"party": _resolve_customer_label(so, side),
 			"to": to,
 			"cc": cc,
-			"subject": _("Trade Confirmation — {0} ({1})").format(
-				so.name or _("unsaved"), _resolve_customer_label(so, side)
-			),
+			"subject": subject,
 			"html": _render_confirmation_email(so, side),
 		}
 	return out

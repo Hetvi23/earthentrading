@@ -63,8 +63,8 @@ def ensure_workflow_prerequisites():
 		("Trader Manager Review", "Primary"),
 		("Final Review", "Primary"),
 		("Pending Assignment", "Inverse"),
-		("In Progress", "Primary"),
-		("Raise Invoice", "Warning"),
+		("Person Assigned", "Primary"),
+		("Tasks Completed", "Warning"),
 		("Completed", "Success"),
 		("Claim", "Danger"),
 		("Rejected", "Danger"),
@@ -198,9 +198,9 @@ def ensure_quotation_workflow():
 def ensure_sales_order_workflow():
 	"""Full SO lifecycle:
 	- Approval: Draft -> [Trader Review if assigned] -> Final Review -> Rejected (loop) | Pending Assignment (auto-submits, doc_status=1)
-	- Operations: Pending Assignment -> In Progress (operations assigns team member + creates project)
-	- Tasks: In Progress -> Raise Invoice (auto when all tasks complete)
-	- Billing: Raise Invoice -> Completed (auto when all linked Sales Invoices are paid)
+	- Operations: Pending Assignment -> Person Assigned (operations assigns team member + creates project)
+	- Tasks: Person Assigned -> Tasks Completed (auto when all tasks complete)
+	- Billing: Tasks Completed -> Completed (auto when all linked Sales Invoices are paid)
 	- Post-completion: Completed -> Claim -> Completed (resolve simply closes it again)
 	"""
 	document_type = "Sales Order"
@@ -247,15 +247,15 @@ def ensure_sales_order_workflow():
 		"states",
 		{"state": "Pending Assignment", "doc_status": "1", "allow_edit": final_role},
 	)
-	# In Progress — operations has assigned a handler and project is running.
+	# Person Assigned — operations has assigned a handler and project is running.
 	wf.append(
 		"states",
-		{"state": "In Progress", "doc_status": "1", "allow_edit": final_role},
+		{"state": "Person Assigned", "doc_status": "1", "allow_edit": final_role},
 	)
-	# Raise Invoice — all project tasks done; accounts can now invoice.
+	# Tasks Completed — all project tasks done; accounts can now invoice.
 	wf.append(
 		"states",
-		{"state": "Raise Invoice", "doc_status": "1", "allow_edit": accounts_role},
+		{"state": "Tasks Completed", "doc_status": "1", "allow_edit": accounts_role},
 	)
 	# Completed — invoices paid. Read-only for most; ops can raise a claim.
 	wf.append(
@@ -362,7 +362,7 @@ def ensure_sales_order_workflow():
 	)
 
 	# --- Operations phase ---
-	# Pending Assignment -> In Progress is fired by api.operations.assign_team_member
+	# Pending Assignment -> Person Assigned is fired by api.operations.assign_team_member
 	# (JS "Assign Team Member" button on the SO form). Still listed here so the
 	# workflow board shows the transition path.
 	wf.append(
@@ -370,28 +370,28 @@ def ensure_sales_order_workflow():
 		{
 			"state": "Pending Assignment",
 			"action": "Assign Team Member",
-			"next_state": "In Progress",
+			"next_state": "Person Assigned",
 			"allowed": final_role,
 		},
 	)
-	# In Progress -> Raise Invoice fires from events.task.on_update when every
+	# Person Assigned -> Tasks Completed fires from events.task.on_update when every
 	# task in the linked project is Completed. Listed here for the board.
 	wf.append(
 		"transitions",
 		{
-			"state": "In Progress",
+			"state": "Person Assigned",
 			"action": "All Tasks Done",
-			"next_state": "Raise Invoice",
+			"next_state": "Tasks Completed",
 			"allowed": final_role,
 		},
 	)
 
 	# --- Billing phase ---
-	# Raise Invoice -> Completed fires from events.sales_invoice when all SIs paid.
+	# Tasks Completed -> Completed fires from events.sales_invoice when all SIs paid.
 	wf.append(
 		"transitions",
 		{
-			"state": "Raise Invoice",
+			"state": "Tasks Completed",
 			"action": "Mark Completed",
 			"next_state": "Completed",
 			"allowed": accounts_role,

@@ -227,28 +227,58 @@
 		// The standard ERPNext "Create" dropdown carries many actions
 		// (Delivery Note, Payment, Material Request, Pick List, …). Keep only:
 		//   • Project   — always (our action, added above)
-		//   • Sales Invoice — only while the SO is in "Raise Invoice" state
-		// Everything else is hidden. Done in the DOM because ERPNext adds its
-		// own Create buttons during its refresh handler.
-		const allowInvoice = frm.doc.workflow_state === "Raise Invoice";
-		setTimeout(() => {
-			const $scope =
+		//   • Sales Invoice — only when the SO is in "Tasks Completed" state AND
+		//     the current user has the Accounts Manager role.
+		// Frappe v15 renders the group as `.inner-group-button[data-label="Create"]`
+		// and each item as `a.dropdown-item[data-label="<English label>"]`; we match
+		// on the language-independent data-label and hide everything else. Re-applied
+		// a couple of times because ERPNext (re)adds its buttons during refresh.
+		const isAccountsManager = (() => {
+			try {
+				return frappe.user.has_role("Accounts Manager");
+			} catch (e) {
+				return (frappe.user_roles || []).indexOf("Accounts Manager") !== -1;
+			}
+		})();
+		const allowInvoice =
+			frm.doc.workflow_state === "Tasks Completed" && isAccountsManager;
+		const keep = new Set(["Project"]);
+		if (allowInvoice) keep.add("Sales Invoice");
+
+		const apply = () => {
+			const $tb =
 				frm.page && frm.page.inner_toolbar && frm.page.inner_toolbar.length
 					? frm.page.inner_toolbar
-					: $(".page-actions");
-			$scope.find(".btn-group").each(function () {
-				const $grp = $(this);
-				const label = ($grp.find(".dropdown-toggle").first().text() || "").trim();
-				if (label !== __("Create")) return;
-				$grp.find("a.dropdown-item, a.grey-link").each(function () {
-					const txt = ($(this).text() || "").trim();
-					let keep = false;
-					if (txt === __("Project")) keep = true;
-					else if (txt === __("Sales Invoice")) keep = allowInvoice;
-					$(this).toggle(keep);
+					: $(".page-actions .custom-actions");
+			if (!$tb || !$tb.length) return;
+
+			// Find the "Create" group (data-label is encodeURIComponent of the
+			// English group label); fall back to matching the button text.
+			let $group = $tb.find(
+				'.inner-group-button[data-label="' + encodeURIComponent("Create") + '"]'
+			);
+			if (!$group.length) {
+				$tb.find(".inner-group-button").each(function () {
+					const txt = ($(this).children("button").first().text() || "").trim();
+					if (txt === __("Create")) $group = $(this);
 				});
+			}
+			if (!$group || !$group.length) return;
+
+			$group.find("a.dropdown-item").each(function () {
+				const $item = $(this);
+				let label = "";
+				try {
+					label = decodeURIComponent($item.attr("data-label") || "");
+				} catch (e) {
+					label = ($item.text() || "").trim();
+				}
+				$item.toggle(keep.has(label));
 			});
-		}, 300);
+		};
+		apply();
+		setTimeout(apply, 300);
+		setTimeout(apply, 900);
 	}
 
 	function openAssignTeamMemberDialog(frm) {

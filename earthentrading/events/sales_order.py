@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Earth Trading and contributors
 # License: MIT. See license.txt
 
+import json
+
 import frappe
 from frappe import _
 
@@ -27,6 +29,87 @@ def validate(doc, method):
 	_sync_assigned_trader_from_items(doc)
 	_reconcile_email_recipients(doc)
 	_send_email_on_trader_approval(doc)
+
+
+# --- Trade-email drafts (edited in the Preview dialog) ----------------------
+
+DRAFT_FIELD = {"buyer": "custom_et_buyer_email_draft", "seller": "custom_et_seller_email_draft"}
+
+
+def load_email_draft(doc, side: str) -> dict | None:
+	"""Parse the saved per-side email draft (JSON: {to, cc, subject, body}).
+	Returns None when nothing was saved from the Preview dialog."""
+	raw = doc.get(DRAFT_FIELD.get(side))
+	if not raw:
+		return None
+	try:
+		data = json.loads(raw)
+	except Exception:
+		return None
+	return data if isinstance(data, dict) else None
+
+
+def split_emails(value) -> list[str]:
+	"""Comma/semicolon/newline-separated address string -> de-duped list."""
+	out: list[str] = []
+	seen: set[str] = set()
+	for chunk in (value or "").replace(";", ",").replace("\n", ",").split(","):
+		addr = chunk.strip()
+		if addr and addr.lower() not in seen:
+			seen.add(addr.lower())
+			out.append(addr)
+	return out
+
+
+def _send_email_on_trader_approval(doc):
+	"""Auto-send the buyer + seller trade emails when the trade manager approves
+	the deal (SO enters Final Review from Trader Manager Review, or Draft ->
+	Final Review when no trader was assigned). Each side uses the trade manager's
+	saved Preview draft when present, otherwise the freshly-rendered default."""
+	if not is_earth_trading_sales_order_workflow_active():
+		return
+	if doc.is_new():
+		return
+	previous = doc.get_doc_before_save()
+	if not previous:
+		return
+	prev_state = previous.get("workflow_state")
+	new_state = doc.get("workflow_state")
+	if new_state == "Final Review" and prev_state in ("Trader Manager Review", "Draft"):
+		_send_side_email(doc, side="buyer", party_side="Customer")
+		_send_side_email(doc, side="seller", party_side="Supplier")
+
+
+def _send_side_email(doc, side: str, party_side: str):
+	draft = load_email_draft(doc, side)
+	if draft:
+		to = split_emails(draft.get("to"))
+		cc = split_emails(draft.get("cc"))
+		subject = draft.get("subject") or _email_subject(doc)
+		body = draft.get("body") or _render_confirmation_email(doc, side)
+	else:
+		to, cc = _collect_to_cc(doc, party_side)
+		subject = _email_subject(doc)
+		body = _render_confirmation_email(doc, side)
+	if not to and not cc:
+		return
+	to_lower = {t.lower() for t in to}
+	cc = [e for e in cc if e.lower() not in to_lower]
+	try:
+		frappe.sendmail(
+			# If no To, fall back to sending to the CC list.
+			recipients=to or cc,
+			cc=cc if to else None,
+			subject=subject,
+			message=body,
+			reference_doctype="Sales Order",
+			reference_name=doc.name,
+			now=False,
+		)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(), "earthentrading.sales_order.approval_email"
+		)
 
 
 def _reconcile_email_recipients(doc):
@@ -92,57 +175,6 @@ def before_submit(doc, method):
 			)
 	if is_earth_trading_quotation_workflow_active():
 		_validate_linked_quotations_approved(doc)
-
-
-def _send_email_on_trader_approval(doc):
-	"""Send the trade confirmation email to buyer + seller when the trade
-	manager approves the deal — i.e. the SO enters Final Review. This happens
-	on Trader Review -> Final Review (trade manager approving an
-	assigned-trader deal) and, when no trader was assigned, on the
-	Draft -> Final Review send-for-approval path. It fires BEFORE the
-	operations manager's final approval. Picks the single- or multi-commodity
-	template based on the number of items on the SO."""
-	if not is_earth_trading_sales_order_workflow_active():
-		return
-	if doc.is_new():
-		return
-	previous = doc.get_doc_before_save()
-	if not previous:
-		return
-	prev_state = previous.get("workflow_state")
-	new_state = doc.get("workflow_state")
-	if new_state == "Final Review" and prev_state in ("Trader Manager Review", "Draft"):
-		_send_approval_email(doc)
-
-
-def _send_approval_email(doc):
-	# Two side-specific emails: the Buyer (Customer side) gets no commission
-	# line; the Seller (Supplier side) does.
-	_send_side_email(doc, side="buyer", party_side="Customer")
-	_send_side_email(doc, side="seller", party_side="Supplier")
-
-
-def _send_side_email(doc, side: str, party_side: str):
-	to, cc = _collect_to_cc(doc, party_side)
-	if not to and not cc:
-		return
-	body = _render_confirmation_email(doc, side)
-	subject = _email_subject(doc)
-	try:
-		frappe.sendmail(
-			# If no row is ticked Primary, fall back to sending to the CC list.
-			recipients=to or cc,
-			cc=cc if to else None,
-			subject=subject,
-			message=body,
-			reference_doctype="Sales Order",
-			reference_name=doc.name,
-			now=False,
-		)
-	except Exception:
-		frappe.log_error(
-			frappe.get_traceback(), "earthentrading.sales_order.approval_email"
-		)
 
 
 def _email_subject(doc) -> str:
@@ -246,8 +278,8 @@ Payment: {_e(doc.get("custom_et_trade_payment") or "")}{commission_line}
 </p>"""
 
 	return f"""<p>Good Day!</p>
-<p>As per our discussion over whatsapp here I confirm the business as per the
-following. Kindly send us the contract at your earliest.</p>
+<p>Following our written exchange, we confirm that the following business has been
+concluded today.</p>
 <p>
 <b>Seller:</b> {_e(seller)}<br>
 <b>Buyer:</b> {_e(buyer)}<br>

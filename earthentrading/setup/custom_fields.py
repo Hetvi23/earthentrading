@@ -162,7 +162,7 @@ CUSTOM_FIELDS = {
 			"fieldname": "custom_et_emails_quick",
 			"fieldtype": "Small Text",
 			"label": "Add Emails (one per line)",
-			"description": "Quick-add: one email per line. On save they are added to the Emails table below — the first becomes the primary / 'To' if none is set yet.",
+			"description": "Quick-add: one email per line. They're added to the Emails table below as you enter them — the first becomes the primary / 'To' if none is set yet.",
 			"insert_after": "custom_et_emails_section",
 			"allow_in_quick_entry": 1,
 		},
@@ -225,7 +225,7 @@ CUSTOM_FIELDS = {
 			"fieldname": "custom_et_emails_quick",
 			"fieldtype": "Small Text",
 			"label": "Add Emails (one per line)",
-			"description": "Quick-add: one email per line. On save they are added to the Emails table below — the first becomes the primary / 'To' if none is set yet.",
+			"description": "Quick-add: one email per line. They're added to the Emails table below as you enter them — the first becomes the primary / 'To' if none is set yet.",
 			"insert_after": "custom_et_emails_section",
 			"allow_in_quick_entry": 1,
 		},
@@ -379,9 +379,9 @@ CUSTOM_FIELDS = {
 		{
 			"fieldname": "custom_et_trade_payment",
 			"fieldtype": "Link",
-			"options": "Payment Terms Template",
+			"options": "ET Payment Term",
 			"label": "Trade Payment",
-			"description": "Payment terms shown in the trade email.",
+			"description": "Payment terms shown in the trade email. Type to pick or create a new term inline.",
 			"insert_after": "custom_et_insurance_value",
 			"reqd": 1,
 		},
@@ -461,6 +461,28 @@ CUSTOM_FIELDS = {
 			"label": "Recipients",
 			"options": "ET Email Recipient",
 			"insert_after": "custom_et_email_section",
+		},
+		# Per-side trade-email drafts (JSON: {to, cc, subject, body}) saved from
+		# the "Preview Trade Email" dialog. The auto-send on approval uses the
+		# draft when present, otherwise the freshly-rendered default. Hidden /
+		# read-only: managed entirely through the preview dialog.
+		{
+			"fieldname": "custom_et_buyer_email_draft",
+			"fieldtype": "Long Text",
+			"label": "Buyer Email Draft",
+			"insert_after": "custom_et_email_recipients",
+			"hidden": 1,
+			"read_only": 1,
+			"no_copy": 1,
+		},
+		{
+			"fieldname": "custom_et_seller_email_draft",
+			"fieldtype": "Long Text",
+			"label": "Seller Email Draft",
+			"insert_after": "custom_et_buyer_email_draft",
+			"hidden": 1,
+			"read_only": 1,
+			"no_copy": 1,
 		},
 	],
 	"Sales Order Item": [

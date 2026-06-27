@@ -393,11 +393,11 @@ def _restore_workflows(names):
 
 
 def _ensure_sales_orders():
-	from earthentrading.setup.payment_terms import ensure_payment_terms_templates
+	from earthentrading.setup.payment_terms import ensure_payment_terms
 
 	# Trade Payment is a Link → Payment Terms Template; make sure the demo
 	# template exists before seeding SOs that reference it.
-	ensure_payment_terms_templates()
+	ensure_payment_terms()
 	company = _company()
 	uom = "Metric Ton"
 	# Wipe any half-inserted drafts from a previous failed run so the loop is

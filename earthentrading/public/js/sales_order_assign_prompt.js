@@ -151,31 +151,82 @@
 				if (!r || !r.message) return;
 				const m = r.message;
 				const esc = (s) => frappe.utils.escape_html(s || "");
-				const recips = (label, list, emptyText) =>
-					`<div><b>${label}:</b> ${
-						list && list.length
-							? esc(list.join(", "))
-							: `<span style="color:var(--text-muted)">${emptyText}</span>`
-					}</div>`;
-				const card = (title, d) => `
-					<div style="margin-bottom:20px;">
-						<div style="font-weight:600; margin-bottom:6px;">${esc(title)}</div>
-						<div style="font-size:12px; margin-bottom:8px; line-height:1.6;">
-							${recips(__("To"), d.to, __("none — nobody is ticked Primary on this side"))}
-							${recips(__("CC"), d.cc, "—")}
-							<div><b>${__("Subject")}:</b> ${esc(d.subject)}</div>
-						</div>
-						<div style="border:1px solid var(--border-color); border-radius:6px; padding:14px; background:var(--card-bg); max-height:360px; overflow:auto;">${d.html}</div>
-					</div>`;
+				// Only the Trade Manager (or an admin) may edit + save the draft.
+				const canEdit =
+					frappe.session.user === "Administrator" ||
+					["ET Trader Manager", "Sales Manager", "System Manager"].some((r) => {
+						try {
+							return frappe.user.has_role(r);
+						} catch (e) {
+							return (frappe.user_roles || []).indexOf(r) !== -1;
+						}
+					});
+				const ro = canEdit ? 0 : 1;
+				const heading = (label, party, edited) =>
+					`<h5 style="margin:0;font-weight:600;">${esc(label)} <span style="color:var(--text-muted);font-weight:400;">→ ${esc(party || "")}</span>${
+						edited ? ` <span style="color:var(--green-600);font-weight:400;font-size:11px;">(${__("edited")})</span>` : ""
+					}</h5>`;
+
+				// To / CC / Subject / Body are all editable. Whatever is saved here is
+				// what the auto-send ships on approval.
+				const sideFields = (side, label, d) => [
+					{ fieldtype: "HTML", fieldname: side + "_hd", options: heading(label, d.party, d.edited) },
+					{ fieldtype: "Data", fieldname: side + "_to", label: __("To"), default: (d.to || []).join(", "), read_only: ro },
+					{ fieldtype: "Data", fieldname: side + "_cc", label: __("CC"), default: (d.cc || []).join(", "), read_only: ro },
+					{ fieldtype: "Data", fieldname: side + "_subject", label: __("Subject"), default: d.subject || "", read_only: ro },
+					{ fieldtype: "Text Editor", fieldname: side + "_body", label: __("Body"), default: d.html || "", read_only: ro },
+				];
+
 				const dlg = new frappe.ui.Dialog({
 					title: __("Trade Email Preview"),
 					size: "extra-large",
-					fields: [{ fieldtype: "HTML", fieldname: "body" }],
+					fields: [
+						...sideFields("buyer", __("Buyer"), m.buyer),
+						{ fieldtype: "Section Break" },
+						...sideFields("seller", __("Seller"), m.seller),
+					],
 				});
-				dlg.fields_dict.body.$wrapper.html(
-					card(__("Buyer email → Customer ({0})", [m.buyer.party]), m.buyer) +
-						card(__("Seller email → Supplier ({0})", [m.seller.party]), m.seller)
-				);
+
+				if (canEdit) {
+					dlg.set_primary_action(__("Save Draft"), () => {
+						if (frm.is_new()) {
+							frappe.msgprint(__("Save the Sales Order first, then edit the email."));
+							return;
+						}
+						const v = dlg.get_values(true) || {};
+						const draft = (side) =>
+							JSON.stringify({
+								to: v[side + "_to"] || "",
+								cc: v[side + "_cc"] || "",
+								subject: v[side + "_subject"] || "",
+								body: v[side + "_body"] || "",
+							});
+						const buyer = draft("buyer");
+						const seller = draft("seller");
+						frappe.call({
+							method: "earthentrading.api.email_preview.save_draft",
+							args: { sales_order: frm.doc.name, buyer: buyer, seller: seller },
+							freeze: true,
+							freeze_message: __("Saving draft…"),
+							callback(res) {
+								if (!res || !res.message || !res.message.ok) return;
+								// Mirror into the in-memory doc so it's not re-rendered as default.
+								frm.doc.custom_et_buyer_email_draft = buyer;
+								frm.doc.custom_et_seller_email_draft = seller;
+								dlg.hide();
+								frappe.show_alert(
+									{
+										message: __("Email draft saved — it will be sent automatically on approval."),
+										indicator: "green",
+									},
+									6
+								);
+							},
+						});
+					});
+				} else {
+					dlg.set_message(__("Only the Trade Manager can edit. This is a preview."));
+				}
 				dlg.show();
 			},
 		});

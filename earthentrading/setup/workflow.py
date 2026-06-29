@@ -287,7 +287,7 @@ def ensure_sales_order_workflow():
 		{
 			"state": "Draft",
 			"action": "Send for Approval",
-			"next_state": "Final Review",
+			"next_state": "Trader Manager Review",
 			"allowed": edit_role,
 			"condition": "not doc.custom_et_assigned_trader",
 		},

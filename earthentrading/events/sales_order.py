@@ -425,7 +425,7 @@ def _buyer_info_block(doc) -> str:
 			"custom_et_pan": "PAN",
 			"custom_et_gst": "GST",
 			"custom_et_fssai": "FSSAI",
-			"custom_et_tra_no": "TRA NO",
+			"custom_et_tra_no": "TRA NO.",
 		}
 		for f, label in labels.items():
 			val = cust_fields.get(f)

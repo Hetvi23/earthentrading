@@ -190,13 +190,17 @@ def _email_subject(doc) -> str:
 	if first is not None:
 		commodity = first.get("item_name") or first.get("item_code") or ""
 		shipping = _format_shipping_period(first)
+	incoterm = doc.get("incoterm") or ""
+	port = doc.get("custom_et_port_of_destination") or ""
+	dest_part = " ".join(p for p in (incoterm, port) if p)
+
 	parts = [
 		doc.get("name") or _("Draft"),
 		_resolve_customer_label(doc, "buyer"),
 		_resolve_customer_label(doc, "seller"),
 		commodity,
 		shipping,
-		doc.get("custom_et_port_of_destination") or "",
+		dest_part,
 	]
 	return " - ".join(str(p) for p in parts if p)
 

@@ -85,6 +85,14 @@
 			frm.set_value("custom_et_buyer_email_draft", "");
 			frm.set_value("custom_et_seller_email_draft", "");
 		},
+		incoterm(frm) {
+			frm.set_value("custom_et_buyer_email_draft", "");
+			frm.set_value("custom_et_seller_email_draft", "");
+		},
+		custom_et_port_of_destination(frm) {
+			frm.set_value("custom_et_buyer_email_draft", "");
+			frm.set_value("custom_et_seller_email_draft", "");
+		},
 	});
 
 	// Pull the candidate recipient rows for the chosen Customer + Supplier and

@@ -276,12 +276,18 @@ def _render_confirmation_email(doc, side: str = "seller") -> str:
 		f"Payment: {_e(doc.get('custom_et_trade_payment') or '')}{commission_line}"
 	)
 
+	note_block = ""
+	notes = doc.get("custom_et_notes")
+	if notes:
+		note_block = f"<b>NOTE: </b>{_e(notes.strip()).replace('\n', '<br>')}"
+
 	paragraphs = [
 		"Good Day!<br>Following our written exchange, we confirm that the following business has been concluded today.",
 		f"<b>Seller:</b> {_e(seller)}<br><b>Buyer:</b> {_e(buyer)}<br><b>Broker:</b> {_e(broker)}",
 		"<br><br>".join(item_blocks),
 		shared,
 		_buyer_info_block(doc),
+		note_block,
 		f"Broker Ref: {_e(doc.name or '')}",
 		"For clarity, please confirm your agreement by replying to this along with the signed contract.",
 		"Thank you for the business."

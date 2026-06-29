@@ -518,10 +518,17 @@ CUSTOM_FIELDS = {
 		# and carries editable Primary (To) / CC ticks; the trade-confirmation
 		# email's To/CC is built from this table.
 		{
+			"fieldname": "custom_et_notes",
+			"fieldtype": "Small Text",
+			"label": "Notes",
+			"description": "Optional notes shown at the bottom of the trade confirmation email.",
+			"insert_after": "custom_et_port_of_destination",
+		},
+		{
 			"fieldname": "custom_et_email_section",
 			"fieldtype": "Section Break",
 			"label": "Email Recipients",
-			"insert_after": "custom_et_port_of_destination",
+			"insert_after": "custom_et_notes",
 			"collapsible": 1,
 			"description": (
 				"Auto-filled from the Customer and Supplier when selected: primary email (To), "

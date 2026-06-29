@@ -252,11 +252,11 @@ def _render_confirmation_email(doc, side: str = "seller") -> str:
 	item_blocks = []
 	for idx, row in enumerate(doc.get("items") or [], start=1):
 		item_blocks.append(
-			f"<b>ITEM NO. {idx}:</b><br>\n"
-			f"Commodity: {_e(row.get('item_name') or row.get('item_code') or '')}<br>\n"
-			f"Price: {_format_price(row, doc)}<br>\n"
-			f"Quantity: {_format_quantity(row)}<br>\n"
-			f"Packaging: {_e(row.get('custom_et_packaging') or '')}<br>\n"
+			f"<b>ITEM NO. {idx}:</b><br>"
+			f"Commodity: {_e(row.get('item_name') or row.get('item_code') or '')}<br>"
+			f"Price: {_format_price(row, doc)}<br>"
+			f"Quantity: {_format_quantity(row)}<br>"
+			f"Packaging: {_e(row.get('custom_et_packaging') or '')}<br>"
 			f"Shipping Period: {_format_shipping_period(row)}"
 		)
 
@@ -267,12 +267,12 @@ def _render_confirmation_email(doc, side: str = "seller") -> str:
 			commission_line = f"<br>Commission: {_e(commission)}"
 
 	shared = (
-		f"Packaging Design: {_e(doc.get('custom_et_packaging_design') or '')}<br>\n"
-		f"Origin: {_e(doc.get('custom_et_origin') or '')}<br>\n"
-		f"Crop: {_e(doc.get('custom_et_crop') or '')}<br>\n"
-		f"Total Quantity: {_format_total_quantity(doc)}<br>\n"
-		f"Parity: {_e(_format_parity(doc))}<br>\n"
-		f"Port of Loading: {_e(_format_loading_port(doc))}<br>\n"
+		f"Packaging Design: {_e(doc.get('custom_et_packaging_design') or '')}<br>"
+		f"Origin: {_e(doc.get('custom_et_origin') or '')}<br>"
+		f"Crop: {_e(doc.get('custom_et_crop') or '')}<br>"
+		f"Total Quantity: {_format_total_quantity(doc)}<br>"
+		f"Parity: {_e(_format_parity(doc))}<br>"
+		f"Port of Loading: {_e(_format_loading_port(doc))}<br>"
 		f"Payment: {_e(doc.get('custom_et_trade_payment') or '')}{commission_line}"
 	)
 
@@ -289,11 +289,7 @@ def _render_confirmation_email(doc, side: str = "seller") -> str:
 
 	paragraphs = [p.strip() for p in paragraphs if p and p.strip()]
 	raw_html = "<br><br>".join(paragraphs)
-
-	cleaned_lines = []
-	for line in raw_html.splitlines():
-		cleaned_lines.append(line.strip())
-	return "\n".join(cleaned_lines)
+	return raw_html.replace("\n", "")
 
 
 # ----------------- small formatting helpers -----------------------------

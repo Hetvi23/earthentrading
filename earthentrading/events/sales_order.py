@@ -275,8 +275,7 @@ Port of Loading: {_e(_format_loading_port(doc))}<br>
 Payment: {_e(doc.get("custom_et_trade_payment") or "")}{commission_line}"""
 
 	paragraphs = [
-		"Good Day!",
-		"Following our written exchange, we confirm that the following business has been concluded today.",
+		"Good Day!<br>Following our written exchange, we confirm that the following business has been concluded today.",
 		f"<b>Seller:</b> {_e(seller)}<br><b>Buyer:</b> {_e(buyer)}<br><b>Broker:</b> {_e(broker)}",
 		"<br><br>".join(item_blocks),
 		shared,

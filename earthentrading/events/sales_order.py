@@ -382,7 +382,9 @@ def _buyer_info_block(doc) -> str:
 	name = doc.get("customer_name") or customer
 
 	address_html = ""
-	addr = frappe.db.get_value("Customer", customer, "customer_primary_address")
+	addr = doc.get("customer_address")
+	if not addr:
+		addr = frappe.db.get_value("Customer", customer, "customer_primary_address")
 	if not addr:
 		try:
 			from frappe.contacts.doctype.address.address import get_default_address
@@ -398,8 +400,13 @@ def _buyer_info_block(doc) -> str:
 		except Exception:
 			address_html = ""
 
+	if not address_html and doc.get("address_display"):
+		address_html = doc.get("address_display")
+
 	contact_lines: list[str] = []
-	contact_name = frappe.db.get_value("Customer", customer, "customer_primary_contact")
+	contact_name = doc.get("contact_person")
+	if not contact_name:
+		contact_name = frappe.db.get_value("Customer", customer, "customer_primary_contact")
 	if contact_name:
 		c = (
 			frappe.db.get_value(

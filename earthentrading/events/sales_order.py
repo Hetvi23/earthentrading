@@ -403,28 +403,13 @@ def _buyer_info_block(doc) -> str:
 	if not address_html and doc.get("address_display"):
 		address_html = doc.get("address_display")
 
-	contact_lines: list[str] = []
-	contact_name = doc.get("contact_person")
-	if not contact_name:
-		contact_name = frappe.db.get_value("Customer", customer, "customer_primary_contact")
-	if contact_name:
-		c = (
-			frappe.db.get_value(
-				"Contact",
-				contact_name,
-				["first_name", "last_name", "email_id", "phone", "mobile_no"],
-				as_dict=True,
-			)
-			or {}
-		)
-		full = " ".join(p for p in (c.get("first_name"), c.get("last_name")) if p)
-		if full:
-			contact_lines.append(f"Contact: {_e(full)}")
-		if c.get("email_id"):
-			contact_lines.append(f"Email: {_e(c.get('email_id'))}")
-		phone = c.get("mobile_no") or c.get("phone")
-		if phone:
-			contact_lines.append(f"Phone: {_e(phone)}")
+	if address_html:
+		lines = []
+		for line in address_html.replace("<br/>", "<br>").replace("\n", "<br>").split("<br>"):
+			stripped = line.strip()
+			if stripped:
+				lines.append(stripped)
+		address_html = "<br>".join(lines)
 
 	tax_lines: list[str] = []
 	try:
@@ -453,8 +438,6 @@ def _buyer_info_block(doc) -> str:
 		parts.append(address_html)  # already-formatted HTML from get_address_display
 	if tax_lines:
 		parts.append("<br>".join(tax_lines))
-	if contact_lines:
-		parts.append("<br>".join(contact_lines))
 	return "<p><b>Buyer Details:</b><br>" + "<br>".join(parts) + "</p>"
 
 

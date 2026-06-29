@@ -279,7 +279,7 @@ def _render_confirmation_email(doc, side: str = "seller") -> str:
 	note_block = ""
 	notes = doc.get("custom_et_notes")
 	if notes:
-		note_block = f"<b>NOTE: </b>{_e(notes.strip()).replace('\n', '<br>')}"
+		note_block = "<b>NOTE: </b>" + _e(notes.strip()).replace('\n', '<br>')
 
 	paragraphs = [
 		"Good Day!<br>Following our written exchange, we confirm that the following business has been concluded today.",

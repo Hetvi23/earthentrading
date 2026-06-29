@@ -426,9 +426,33 @@ def _buyer_info_block(doc) -> str:
 		if phone:
 			contact_lines.append(f"Phone: {_e(phone)}")
 
+	tax_lines: list[str] = []
+	try:
+		cust_fields = frappe.db.get_value(
+			"Customer",
+			customer,
+			["custom_et_iec", "custom_et_pan", "custom_et_gst", "custom_et_fssai", "custom_et_tra_no"],
+			as_dict=True
+		) or {}
+		labels = {
+			"custom_et_iec": "IEC",
+			"custom_et_pan": "PAN",
+			"custom_et_gst": "GST",
+			"custom_et_fssai": "FSSAI",
+			"custom_et_tra_no": "TRA NO",
+		}
+		for f, label in labels.items():
+			val = cust_fields.get(f)
+			if val:
+				tax_lines.append(f"{label} : {_e(val)}")
+	except Exception:
+		pass
+
 	parts = [f"<b>{_e(name)}</b>"]
 	if address_html:
 		parts.append(address_html)  # already-formatted HTML from get_address_display
+	if tax_lines:
+		parts.append("<br>".join(tax_lines))
 	if contact_lines:
 		parts.append("<br>".join(contact_lines))
 	return "<p><b>Buyer Details:</b><br>" + "<br>".join(parts) + "</p>"

@@ -197,6 +197,43 @@ CUSTOM_FIELDS = {
 			"description": "Bank / wire-transfer details for this customer. Tick Primary for the main account.",
 			"insert_after": "custom_et_bank_section",
 		},
+		{
+			"fieldname": "custom_et_tax_section",
+			"fieldtype": "Section Break",
+			"label": "Tax & Registration",
+			"insert_after": "custom_et_bank_accounts",
+			"collapsible": 1,
+		},
+		{
+			"fieldname": "custom_et_iec",
+			"fieldtype": "Data",
+			"label": "IEC",
+			"insert_after": "custom_et_tax_section",
+		},
+		{
+			"fieldname": "custom_et_pan",
+			"fieldtype": "Data",
+			"label": "PAN",
+			"insert_after": "custom_et_iec",
+		},
+		{
+			"fieldname": "custom_et_gst",
+			"fieldtype": "Data",
+			"label": "GST",
+			"insert_after": "custom_et_pan",
+		},
+		{
+			"fieldname": "custom_et_fssai",
+			"fieldtype": "Data",
+			"label": "FSSAI",
+			"insert_after": "custom_et_gst",
+		},
+		{
+			"fieldname": "custom_et_tra_no",
+			"fieldtype": "Data",
+			"label": "TRA NO",
+			"insert_after": "custom_et_fssai",
+		},
 	],
 	"Supplier": [
 		{
@@ -259,6 +296,43 @@ CUSTOM_FIELDS = {
 			"options": "ET Bank Account",
 			"description": "Bank / wire-transfer details for this supplier. Tick Primary for the main account.",
 			"insert_after": "custom_et_bank_section",
+		},
+		{
+			"fieldname": "custom_et_tax_section",
+			"fieldtype": "Section Break",
+			"label": "Tax & Registration",
+			"insert_after": "custom_et_bank_accounts",
+			"collapsible": 1,
+		},
+		{
+			"fieldname": "custom_et_iec",
+			"fieldtype": "Data",
+			"label": "IEC",
+			"insert_after": "custom_et_tax_section",
+		},
+		{
+			"fieldname": "custom_et_pan",
+			"fieldtype": "Data",
+			"label": "PAN",
+			"insert_after": "custom_et_iec",
+		},
+		{
+			"fieldname": "custom_et_gst",
+			"fieldtype": "Data",
+			"label": "GST",
+			"insert_after": "custom_et_pan",
+		},
+		{
+			"fieldname": "custom_et_fssai",
+			"fieldtype": "Data",
+			"label": "FSSAI",
+			"insert_after": "custom_et_gst",
+		},
+		{
+			"fieldname": "custom_et_tra_no",
+			"fieldtype": "Data",
+			"label": "TRA NO",
+			"insert_after": "custom_et_fssai",
 		},
 	],
 	"Quotation": [

@@ -59,15 +59,27 @@
 		},
 	});
 
-	// --- Email-recipient auto-fill ------------------------------------------
+	// --- Email-recipient auto-fill & Draft clearing --------------------------
 	frappe.ui.form.on("Sales Order", {
 		customer(frm) {
 			dropRecipientSide(frm, "Customer");
 			fillRecipients(frm);
+			frm.set_value("custom_et_buyer_email_draft", "");
+			frm.set_value("custom_et_seller_email_draft", "");
 		},
 		custom_et_supplier(frm) {
 			dropRecipientSide(frm, "Supplier");
 			fillRecipients(frm);
+			frm.set_value("custom_et_buyer_email_draft", "");
+			frm.set_value("custom_et_seller_email_draft", "");
+		},
+		customer_address(frm) {
+			frm.set_value("custom_et_buyer_email_draft", "");
+			frm.set_value("custom_et_seller_email_draft", "");
+		},
+		contact_person(frm) {
+			frm.set_value("custom_et_buyer_email_draft", "");
+			frm.set_value("custom_et_seller_email_draft", "");
 		},
 	});
 

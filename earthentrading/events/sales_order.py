@@ -252,13 +252,12 @@ def _render_confirmation_email(doc, side: str = "seller") -> str:
 	item_blocks = []
 	for idx, row in enumerate(doc.get("items") or [], start=1):
 		item_blocks.append(
-			f"""<p><b>ITEM NO. {idx}:</b><br>
+			f"""<b>ITEM NO. {idx}:</b><br>
 Commodity: {_e(row.get("item_name") or row.get("item_code") or "")}<br>
 Price: {_format_price(row, doc)}<br>
 Quantity: {_format_quantity(row)}<br>
 Packaging: {_e(row.get("custom_et_packaging") or "")}<br>
-Shipping Period: {_format_shipping_period(row)}
-</p>"""
+Shipping Period: {_format_shipping_period(row)}"""
 		)
 
 	commission_line = ""
@@ -267,31 +266,33 @@ Shipping Period: {_format_shipping_period(row)}
 		if commission:
 			commission_line = f"<br>Commission: {_e(commission)}"
 
-	shared = f"""<p>
-Packaging Design: {_e(doc.get("custom_et_packaging_design") or "")}<br>
+	shared = f"""Packaging Design: {_e(doc.get("custom_et_packaging_design") or "")}<br>
 Origin: {_e(doc.get("custom_et_origin") or "")}<br>
 Crop: {_e(doc.get("custom_et_crop") or "")}<br>
 Total Quantity: {_format_total_quantity(doc)}<br>
 Parity: {_e(_format_parity(doc))}<br>
 Port of Loading: {_e(_format_loading_port(doc))}<br>
-Payment: {_e(doc.get("custom_et_trade_payment") or "")}{commission_line}
-</p>"""
+Payment: {_e(doc.get("custom_et_trade_payment") or "")}{commission_line}"""
 
-	return f"""<p>Good Day!</p>
-<p>Following our written exchange, we confirm that the following business has been
-concluded today.</p>
-<p>
-<b>Seller:</b> {_e(seller)}<br>
-<b>Buyer:</b> {_e(buyer)}<br>
-<b>Broker:</b> {_e(broker)}
-</p>
-{''.join(item_blocks)}
-{shared}
-{_buyer_info_block(doc)}
-<p>Broker Ref: {_e(doc.name or "")}</p>
-<p>For clarity, please confirm your agreement by replying to this along with the signed contract.</p>
-<p>Thank you for the business.</p>
-"""
+	paragraphs = [
+		"Good Day!",
+		"Following our written exchange, we confirm that the following business has been concluded today.",
+		f"<b>Seller:</b> {_e(seller)}<br><b>Buyer:</b> {_e(buyer)}<br><b>Broker:</b> {_e(broker)}",
+		"<br><br>".join(item_blocks),
+		shared,
+		_buyer_info_block(doc),
+		f"Broker Ref: {_e(doc.name or '')}",
+		"For clarity, please confirm your agreement by replying to this along with the signed contract.",
+		"Thank you for the business."
+	]
+
+	paragraphs = [p.strip() for p in paragraphs if p and p.strip()]
+	raw_html = "<br><br>".join(paragraphs)
+
+	cleaned_lines = []
+	for line in raw_html.splitlines():
+		cleaned_lines.append(line.strip())
+	return "\n".join(cleaned_lines)
 
 
 # ----------------- small formatting helpers -----------------------------
@@ -438,7 +439,7 @@ def _buyer_info_block(doc) -> str:
 		parts.append(address_html)  # already-formatted HTML from get_address_display
 	if tax_lines:
 		parts.append("<br>".join(tax_lines))
-	return "<p><b>Buyer Details:</b><br>" + "<br>".join(parts) + "</p>"
+	return "<b>Buyer Details:</b><br>" + "<br>".join(parts)
 
 
 def _e(s) -> str:
